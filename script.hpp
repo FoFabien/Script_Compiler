@@ -14,7 +14,7 @@
 //***************************************************************************************************************
 // COMPILE
 //***************************************************************************************************************
-enum {INVALID, STR, INT, FLOAT, OPERATOR, LBRK, RBRK, COMMA, LCUR, RCUR, FUNC, VAR, RESULT, CVAR, COP, CFUNC, TBD};
+enum {INVALID, STR, INT, FLOAT, OPERATOR, LBRK, RBRK, COMMA, LCUR, RCUR, FUNC, VAR, RESULT, CVAR, COP, CFUNC, GFUNC, TBD};
 enum {UNDEF, PREFIX, INFIX, POSTFIX};
 
 class Token
@@ -113,7 +113,9 @@ struct Function
 typedef std::vector<Function> Runtime;
 
 class Script;
-typedef const std::function<void(Script*, Line&)> Callback;
+//typedef const std::function<void(Script*, Line&)> Callback;
+typedef void (*Callback)(Script*, Line&) ;
+typedef std::unordered_map<std::string, Callback>::iterator CallRef;
 
 struct IfPos
 {
@@ -143,7 +145,7 @@ class Script
         virtual ~Script();
         bool load(const std::string& file);
         bool run();
-        void setError();
+        void setError(const std::string& err = "");
         void setVar(const int& i, const int& v, const int &type);
         void setVar(const int& i, const std::string& v, const int &type);
         void setVar(const int& i, const float& v, const int &type);
@@ -151,17 +153,13 @@ class Script
         Value& getVar(const int& i, const int &type);
         const void* getValueContent(const Value& v, int &type);
 
-        void enterScope(const bool& loop);
-        void skipScope(const bool& checkElse);
+        void enterBlock(const bool& loop);
+        void skipBlock(const bool& checkElse);
         void push_stack(Value* v);
-        void ret(const Value* v);
-        void ret(const int& v);
-        void ret(const float& v);
-        void ret(const std::string& v);
 
         static bool compile(const std::string& file, const std::string& output, const char &flag = NONE);
 
-        static void addGlobalFunction(const std::string& name, Callback& callback, const size_t &argn);
+        static void addGlobalFunction(const std::string& name, Callback callback, const size_t &argn);
 
         static void _if(Script* s, Line& l);
         static void _else(Script* s, Line& l);
@@ -171,17 +169,28 @@ class Script
         static void _debug(Script* s, Line& l);
         static void _break(Script* s, Line& l);
 
+        bool rejectReturn(const Line& l);
+        void funcReturn(const Value& v, Line& l);
+        void funcReturn(const int& v, Line& l);
+        void funcReturn(const float& v, Line& l);
+        void funcReturn(const std::string& v, Line& l);
+
     protected:
         static bool shuntingyard(const TokenIDList& tokens, Compiled& code);
         static bool format(Program &prog, VariableList &vars, Compiled& code);
         static int errorCheck(Compiled& code);
-        static bool optimize(Compiled& code);
+        static bool postprocessing(Compiled& code);
         static bool save(const std::string& output, const Compiled& code);
         static void print(Compiled& code);
         static void debug(Program& code);
 
         void operation(Line& line);
         int get_while_loop_point();
+
+        void ret(const Value* v);
+        void ret(const int& v);
+        void ret(const float& v);
+        void ret(const std::string& v);
 
         // debug
         void printValue(const Value& v, const bool& isContent = false);

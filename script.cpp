@@ -292,8 +292,10 @@ void Value::clear()
         case FLOAT:
             delete (float*)p;
             break;
-        case LCUR: case RCUR:
-        default: break;
+        case GFUNC:
+            delete (CallRef*)p;
+            break;
+        case LCUR: case RCUR: default: break;
     }
     t = TBD;
     p = nullptr;
@@ -310,10 +312,13 @@ bool Value::set(const void *any, const int& type)
                 p = new std::string(((std::string*)any)->c_str());
                 break;
             case INT: case COP: case RESULT: case CVAR: case CFUNC:
-                p = new int(*(int*)any);
+                p = new int(*(const int*)any);
                 break;
             case FLOAT:
-                p = new float(*(float*)any);
+                p = new float(*(const float*)any);
+                break;
+            case GFUNC:
+                p = new CallRef(*(const CallRef*)any);
                 break;
             case LCUR: case RCUR:
                 p = nullptr;
@@ -327,13 +332,16 @@ bool Value::set(const void *any, const int& type)
         switch(type)
         {
             case FUNC: case STR:
-                (*(std::string*)p) = ((std::string*)any)->c_str();
+                (*(std::string*)p) = ((const std::string*)any)->c_str();
                 break;
             case INT: case COP: case RESULT: case CVAR: case CFUNC:
-                (*(int*)p) = (*(int*)any);
+                (*(int*)p) = (*(const int*)any);
                 break;
             case FLOAT:
-                (*(float*)p) = (*(float*)any);
+                (*(float*)p) = (*(const float*)any);
+                break;
+            case GFUNC:
+                (*(CallRef*)p) = (*(const CallRef*)any);
                 break;
             case LCUR: case RCUR:
                 break;
@@ -404,7 +412,7 @@ bool Value::operator==(const Value& rhs)
         case STR: case OPERATOR: case LBRK: case RBRK: case COMMA: case LCUR: case RCUR: case FUNC: case VAR: case TBD:
             return (*(std::string*)p == *(std::string*)rhs.p);
         default:
-            return true;
+            return false;
     }
 }
 
@@ -499,6 +507,7 @@ bool Script::load(const std::string& file)
             switch(c)
             {
                 case FUNC:
+                {
                     f.read((char*)&tmp, 4);
                     buf = "";
                     if(tmp)
@@ -506,9 +515,10 @@ bool Script::load(const std::string& file)
                         buf.resize(tmp);
                         f.read(&(buf[0]), tmp);
                     }
-                    if(gl_func.find(buf) != gl_func.end())
+                    auto itf = gl_callback.find(buf);
+                    if(itf != gl_callback.end())
                     {
-                        xi.op.set(&buf, FUNC);
+                        xi.op.set(&itf, GFUNC);
                     }
                     else
                     {
@@ -523,6 +533,7 @@ bool Script::load(const std::string& file)
                         xi.op.set(&fid, CFUNC);
                     }
                     break;
+                }
                 case COP: case CFUNC:
                     f.read((char*)&tmp, 4);
                     xi.op.set(&tmp, c);
@@ -603,18 +614,15 @@ bool Script::run()
         //std::cout << id << " -> " << pc << " : " << scope << " | " << ifstack.size() << std::endl;
         switch(line.op.getType())
         {
-            case FUNC:
+            case GFUNC:
             {
-                const std::string &fname = *(line.op.get<std::string>());
-                if(!canElse && (fname == "elif" || fname == "else"))
-                {
-                    skipScope(false);
-                    break;
-                }
-                gl_callback[fname](this, line);
+                const CallRef& foo = *(line.op.get<CallRef>());
+                foo->second(this, line);
                 break;
             }
-            case COP: operation(line); break;
+            case COP:
+                operation(line);
+                break;
             case CFUNC:
             {
                 std::vector<const Value*> args;
@@ -625,7 +633,7 @@ bool Script::run()
                     {
                         case INT: case FLOAT: case STR: args.push_back(&line.params[i]); break;
                         case RESULT: case CVAR: args.push_back(&getVar(*(line.params[i].get<int>()), line.params[i].getType())); break;
-                        default: setError(); return false;
+                        default: setError("invalid parameter #" + std::to_string(i)); return false;
                     }
                 }
                 if(line.hasResult)
@@ -637,7 +645,7 @@ bool Script::run()
                             push_stack(&line.params.back());
                             break;
                         }
-                        default: setError(); return false;
+                        default: setError("invalid result value"); return false;
                     }
                 }
                 else push_stack(nullptr);
@@ -651,8 +659,7 @@ bool Script::run()
                 break;
             }
             case LCUR:
-                std::cout << pc << ": error: unprocessed block start" << std::endl;
-                setError();
+                setError("unexpected block start");
                 return false;
             case RCUR:
                 scope--;
@@ -667,12 +674,11 @@ bool Script::run()
                 }
                 if(scope < 0)
                 {
-                    setError();
+                    setError("unexpected block end");
                 }
                 break;
             default:
-                std::cout << pc << ": error: " << line.op.getType() << std::endl;
-                setError();
+                setError("invalid instruction (type: " + std::to_string(line.op.getType()));
                 return false;
         }
         if(pc == (int)code[id].line.size() - 1)
@@ -690,11 +696,13 @@ bool Script::run()
     return false;
 }
 
-void Script::setError()
+void Script::setError(const std::string& err)
 {
     state = ERROR;
     std::cout << "Error flag raised" << std::endl;
     std::cout << "pc=" << pc << ", scope=" << scope << ", id=" << id << std::endl;
+    if(!err.empty())
+        std::cout << "Message: " << err << std::endl;
 }
 
 void Script::setVar(const int& i, const int& v, const int &type)
@@ -704,10 +712,10 @@ void Script::setVar(const int& i, const int& v, const int &type)
     {
         case RESULT: p = &(currentRegs[i]); break;
         case CVAR: p = &(currentVars[i]); break;
-        default: std::cout << "Script::setVar() error" << std::endl; setError(); return;
+        default: setError("setVar(int) error"); return;
     }
     if(!p->set(v))
-        setError();
+        setError("set(int) error");
 }
 
 void Script::setVar(const int& i, const std::string& v, const int &type)
@@ -717,10 +725,10 @@ void Script::setVar(const int& i, const std::string& v, const int &type)
     {
         case RESULT: p = &(currentRegs[i]); break;
         case CVAR: p = &(currentVars[i]); break;
-        default: std::cout << "Script::setVar() error" << std::endl; setError(); return;
+        default: setError("setVar(string) error"); return;
     }
     if(!p->set(v))
-        setError();
+        setError("set(string) error");
 }
 
 void Script::setVar(const int& i, const float& v, const int &type)
@@ -730,10 +738,10 @@ void Script::setVar(const int& i, const float& v, const int &type)
     {
         case RESULT: p = &(currentRegs[i]); break;
         case CVAR: p = &(currentVars[i]); break;
-        default: std::cout << "Script::setVar() error" << std::endl; setError(); return;
+        default: setError("setVar(float) error"); return;
     }
     if(!p->set(v))
-        setError();
+        setError("set(float) error");
 }
 
 void Script::setVar(const int& i, const Value& v, const int &type)
@@ -743,10 +751,10 @@ void Script::setVar(const int& i, const Value& v, const int &type)
     {
         case RESULT: p = &(currentRegs[i]); break;
         case CVAR: p = &(currentVars[i]); break;
-        default: std::cout << "Script::setVar() error" << std::endl; setError(); return;
+        default: setError("setVar(Value) error"); return;
     }
     if(!p->set(v.getP(), v.getType()))
-        setError();
+        setError("set(Value) error");
 }
 
 Value& Script::getVar(const int& i, const int &type)
@@ -755,7 +763,7 @@ Value& Script::getVar(const int& i, const int &type)
     {
         case RESULT: return currentRegs[i];
         case CVAR: return currentVars[i];
-        default: std::cout << "Script::getVar() error" << std::endl; setError(); return code[id].line[pc].op;
+        default: setError("getVar() error"); return code[id].line[pc].op;
     }
 }
 
@@ -780,11 +788,11 @@ const void* Script::getValueContent(const Value& v, int &type)
     return p;
 }
 
-void Script::enterScope(const bool& loop)
+void Script::enterBlock(const bool& loop)
 {
     if(pc+1 >= (int)code[id].line.size() || code[id].line[pc+1].op.getType() != LCUR)
     {
-        setError();
+        setError("can't enter block, unexpected end of function");
         return;
     }
     canElse = false;
@@ -799,11 +807,11 @@ void Script::enterScope(const bool& loop)
     scope++;
 }
 
-void Script::skipScope(const bool& checkElse)
+void Script::skipBlock(const bool& checkElse)
 {
     if(pc+1 >= (int)code[id].line.size() || code[id].line[pc+1].op.getType() != LCUR)
     {
-        setError();
+        setError("can't skip block, unexpected end of function");
         return;
     }
     pc += 2;
@@ -820,7 +828,7 @@ void Script::skipScope(const bool& checkElse)
     --pc;
     if((int)current != current)
     {
-        setError();
+        setError("malformed block error");
         return;
     }
     canElse = checkElse;
@@ -845,7 +853,7 @@ void Script::ret(const Value* v)
 {
     if(return_stack.empty())
     {
-        if(id != entrypoint) setError();
+        if(id != entrypoint) setError("return stack is empty");
         else state = STOP;
     }
     else
@@ -856,11 +864,11 @@ void Script::ret(const Value* v)
         {
             if(!v)
             {
-                setError();
+                setError("can't return a nullptr");
                 return;
             }
             if(!p->set(v->getP(), v->getType()))
-                setError();
+                setError("set(Value) error in ret(Value)");
         }
     }
     if(!call_stack.empty())
@@ -882,7 +890,7 @@ void Script::ret(const int& v)
 {
     if(return_stack.empty())
     {
-        if(id != entrypoint) setError();
+        if(id != entrypoint) setError("return stack is empty");
         else state = STOP;
     }
     else
@@ -892,7 +900,7 @@ void Script::ret(const int& v)
         if(p)
         {
             if(!p->set(v))
-                setError();
+                setError("set(int) error in ret(int)");
         }
     }
     if(!call_stack.empty())
@@ -914,7 +922,7 @@ void Script::ret(const float& v)
 {
     if(return_stack.empty())
     {
-        if(id != entrypoint) setError();
+        if(id != entrypoint) setError("return stack is empty");
         else state = STOP;
     }
     else
@@ -924,7 +932,7 @@ void Script::ret(const float& v)
         if(p)
         {
             if(!p->set(v))
-                setError();
+                setError("set(float) error in ret(float)");
         }
     }
     if(!call_stack.empty())
@@ -946,7 +954,7 @@ void Script::ret(const std::string& v)
 {
     if(return_stack.empty())
     {
-        if(id != entrypoint) setError();
+        if(id != entrypoint) setError("return stack is empty");
         else state = STOP;
     }
     else
@@ -956,7 +964,7 @@ void Script::ret(const std::string& v)
         if(p)
         {
             if(!p->set(v))
-                setError();
+                setError("set(string) error in ret(string)");
         }
     }
     if(!call_stack.empty())
@@ -1277,10 +1285,10 @@ bool Script::compile(const std::string& file, const std::string& output, const c
         }
     }
 
-    if(!err && !optimize(code))
+    if(!err && !postprocessing(code))
     {
         err = true;
-        std::cout << "optimization failed" << std::endl;
+        std::cout << "postprocessing failed" << std::endl;
     }
 
     if(!err && (flag & PRINT))
@@ -1575,6 +1583,7 @@ have_operand: // explicit
 
 ended:
     //we are done
+    //debug(prog);
     if(!format(prog, vars, code)) // convert RPN to something easier to process
     {
         std::cout << "Conversion error" << std::endl;
@@ -1660,7 +1669,6 @@ bool Script::format(Program &prog, VariableList &vars, Compiled& code)
                     if(isSingleOp(xj[i]->getString()) || (xj[i]->getString() == "-" && xj[i]->getTag() == PREFIX))
                         j = i - 1;
                     else j = i - 2;
-                    if(j < 0) goto fc_error;
                 }
                 else if(xj[i]->getType() == FUNC)
                 {
@@ -1672,12 +1680,13 @@ bool Script::format(Program &prog, VariableList &vars, Compiled& code)
                         auto bst = gl_func.find(xj[i]->getString());
                         if(bst != gl_func.end())
                             j = i - bst->second;
-                        else goto fc_error;
+                        else goto fc_misf_error;
                     }
                 }
                 else continue; // else, next token
+                if(j < 0) goto fc_argn_error;
 
-                // j contains the number of parameters needed by the function/operator
+                // j contains the position of the first parameter needed by the function/operator
 
                 // create the instruction
                 Instruction ins;
@@ -1689,29 +1698,31 @@ bool Script::format(Program &prog, VariableList &vars, Compiled& code)
                         if(j != i - 1) goto fc_error;
                         switch(xj[j]->getType())
                         {
-                            case FUNC: case OPERATOR:
-                                goto fc_error;
-                                break;
                             case RESULT:
-                                regs[xj[j]->getInt()] = false;
-                            default:
+                                regs[xj[j]->getInt()] = false; // nobreak
+                            case INT: case FLOAT: case STR: case VAR:
                                 ins.params.push_back(Token::make(*xj[j]));
+                                break;
+                            default:
+                                goto fc_para_error;
+                                break;
                         }
                         postfixes.push_back(ins);
                         xj.erase(xj.begin()+i); // remove the used tokens from the RPN lines
                         --i;
                         break;
                     case PREFIX: // - ! ++ --
-                        if(j != i - 1) goto fc_error;
+                        if(j != i - 1) goto fc_argn_error;
                         switch(xj[j]->getType())
                         {
-                            case FUNC: case OPERATOR:
-                                goto fc_error;
-                                break;
                             case RESULT:
-                                regs[xj[j]->getInt()] = false;
-                            default:
+                                regs[xj[j]->getInt()] = false; // nobreak
+                            case INT: case FLOAT: case STR: case VAR:
                                 ins.params.push_back(Token::make(*xj[j]));
+                                break;
+                            default:
+                                goto fc_para_error;
+                                break;
                         }
                         switch(op_unordered_map.at(ins.op->getString()))
                         {
@@ -1738,7 +1749,7 @@ bool Script::format(Program &prog, VariableList &vars, Compiled& code)
                                 xj.erase(xj.begin()+i); // remove the used tokens from the RPN lines
                                 --i;
                                 break;
-                            default: ins.op = nullptr; ins.clear(); goto fc_error;
+                            default: ins.op = nullptr; ins.clear(); goto fc_op_error;
                         }
                         break;
                     default: // everything else
@@ -1748,13 +1759,14 @@ bool Script::format(Program &prog, VariableList &vars, Compiled& code)
                             {
                                 switch(xj[k]->getType())
                                 {
-                                    case FUNC: case OPERATOR:
-                                        goto fc_error;
-                                        break;
                                     case RESULT:
-                                        regs[xj[k]->getInt()] = false;
-                                    default:
+                                        regs[xj[k]->getInt()] = false; // nobreak
+                                    case INT: case FLOAT: case STR: case VAR:
                                         ins.params.push_back(xj[k]);
+                                        break;
+                                    default:
+                                        goto fc_para_error;
+                                        break;
                                 }
                             }
                         // search a free tmp variable (to store the result)
@@ -1790,11 +1802,26 @@ bool Script::format(Program &prog, VariableList &vars, Compiled& code)
                 }while(!postfixes.empty());
             }
             else if(xj.size() != 1 || xj[0]->getType() != RESULT)
-                goto fc_error;
+                goto fc_end_error;
         }
     }
     return true;
 
+fc_argn_error:
+    std::cout << "number of parameters doesn't match the function definition" << std::endl;
+    goto fc_error;
+fc_para_error:
+    std::cout << "unexpected parameter type, the problem is either an incorrect number of parameters or a compiler issue" << std::endl;
+    goto fc_error;
+fc_op_error:
+    std::cout << "unexpected operator, compiler issue" << std::endl;
+    goto fc_error;
+fc_misf_error:
+    std::cout << "unknown function" << std::endl;
+    goto fc_error;
+fc_end_error:
+    std::cout << "unexpected code end" << std::endl;
+    goto fc_error;
 fc_error:
     for(auto &xi: code)
     {
@@ -1857,7 +1884,7 @@ int Script::errorCheck(Compiled& code)
     return 0;
 }
 
-bool Script::optimize(Compiled& code)
+bool Script::postprocessing(Compiled& code)
 {
     for(auto &xi: code)
     {
@@ -2762,10 +2789,10 @@ void Script::operation(Line& line)
 
     return;
 op_ins_error:
-    setError();
+    setError("malformed operation");
     return;
 op_div_error:
-    setError();
+    setError("division by zero");
     return;
 }
 
@@ -2882,7 +2909,7 @@ int Script::get_while_loop_point()
     return i;
 }
 
-void Script::addGlobalFunction(const std::string& name, Callback& callback, const size_t &argn)
+void Script::addGlobalFunction(const std::string& name, Callback callback, const size_t &argn)
 {
     gl_func[name] = argn;
     gl_callback.insert(std::pair<std::string, Callback>(name, callback));
@@ -2911,6 +2938,40 @@ void Script::printValue(const Value& v, const bool& isContent)
     }
 }
 
+bool Script::rejectReturn(const Line& l)
+{
+    if(l.hasResult)
+    {
+        setError("function doesn't return a result");
+        return true;
+    }
+    return false;
+}
+
+void Script::funcReturn(const Value& v, Line& l)
+{
+    if(l.hasResult)
+        setVar(*l.params.back().get<int>(), v, l.params.back().getType());
+}
+
+void Script::funcReturn(const int& v, Line& l)
+{
+    if(l.hasResult)
+        setVar(*l.params.back().get<int>(), v, l.params.back().getType());
+}
+
+void Script::funcReturn(const float& v, Line& l)
+{
+    if(l.hasResult)
+        setVar(*l.params.back().get<int>(), v, l.params.back().getType());
+}
+
+void Script::funcReturn(const std::string& v, Line& l)
+{
+    if(l.hasResult)
+        setVar(*l.params.back().get<int>(), v, l.params.back().getType());
+}
+
 void Script::_if(Script* s, Line& l)
 {
     if(l.params.size() < 1 || l.hasResult)
@@ -2929,8 +2990,8 @@ void Script::_if(Script* s, Line& l)
         default: s->setError(); return;
     }
 
-    if(r) s->enterScope(false);
-    else s->skipScope(true);
+    if(r) s->enterBlock(false);
+    else s->skipBlock(true);
 }
 
 void Script::_else(Script* s, Line& l)
@@ -2940,7 +3001,7 @@ void Script::_else(Script* s, Line& l)
         s->setError();
         return;
     }
-    s->enterScope(false);
+    s->enterBlock(false);
 }
 
 void Script::_return(Script* s, Line& l)
@@ -2972,8 +3033,8 @@ void Script::_while(Script* s, Line& l)
         default: s->setError(); return;
     }
 
-    if(r) s->enterScope(true);
-    else s->skipScope(false);
+    if(r) s->enterBlock(true);
+    else s->skipBlock(false);
 }
 
 void Script::_print(Script* s, Line& l)
