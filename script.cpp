@@ -2748,8 +2748,8 @@ void Script::operation(Line& line)
         case 18: // ++
             switch(t[0])
             {
-                case INT: setVar(*target, (*(const int*)u[0] != 0)+1, ttype); break;
-                case FLOAT: setVar(*target, (*(const float*)u[0] != 0)+1, ttype); break;
+                case INT: setVar(*target, *(const int*)u[0]+1, ttype); break;
+                case FLOAT: setVar(*target, *(const float*)u[0]+1, ttype); break;
                 case STR: goto op_ins_error;
                 default: goto op_ins_error;
             }
@@ -2757,8 +2757,8 @@ void Script::operation(Line& line)
         case 19: // --
             switch(t[0])
             {
-                case INT: setVar(*target, (*(const int*)u[0] != 0)-1, ttype); break;
-                case FLOAT: setVar(*target, (*(const float*)u[0] != 0)-1, ttype); break;
+                case INT: setVar(*target, *(const int*)u[0]-1, ttype); break;
+                case FLOAT: setVar(*target, *(const float*)u[0]-1, ttype); break;
                 case STR: goto op_ins_error;
                 default: goto op_ins_error;
             }
