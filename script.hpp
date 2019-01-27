@@ -113,7 +113,6 @@ struct Function
 typedef std::vector<Function> Runtime;
 
 class Script;
-//typedef const std::function<void(Script*, Line&)> Callback;
 typedef void (*Callback)(Script*, Line&) ;
 typedef std::unordered_map<std::string, Callback>::iterator CallRef;
 

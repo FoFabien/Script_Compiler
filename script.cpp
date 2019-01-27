@@ -2223,12 +2223,7 @@ void Script::operation(Line& line)
     int ttype;
     bool equal = false;
 
-    const int *a[2];
-    const float *b[2];
-    const std::string *c[2];
-    int ra;
-    float rb;
-    std::string rc;
+    const void *u[2];
     int t[2];
     Value* V[2];
 
@@ -2299,38 +2294,16 @@ void Script::operation(Line& line)
     }
 
     for(int i = 0; i < n; ++i)
-    {
-        t[i] = V[i]->getType();
-        switch(t[i])
-        {
-            case INT: a[i] = V[i]->get<int>(); break;
-            case FLOAT: b[i] = V[i]->get<float>(); break;
-            case STR: c[i] = V[i]->get<std::string>(); break;
-            case CVAR: case RESULT:
-            {
-                const Value& W = getVar(*V[i]->get<int>(), t[i]);
-                t[i] = W.getType();
-                switch(t[i])
-                {
-                    case INT: a[i] = W.get<int>(); break;
-                    case FLOAT: b[i] = W.get<float>(); break;
-                    case STR: c[i] = W.get<std::string>(); break;
-                    default: std::cout << "uninitialized variable" << std::endl; goto op_ins_error;
-                }
-                break;
-            }
-            default: goto op_ins_error;
-        }
-    }
+        u[i] = getValueContent(*V[i], t[i]);
 
     switch(op_id)
     {
         case 0:
             switch(t[0])
             {
-                case INT: ra = *a[0]; break;
-                case FLOAT: rb = *b[0]; break;
-                case STR: rc = *c[0]; break;
+                case INT: setVar(*target, *(const int*)u[0], ttype); break;
+                case FLOAT: setVar(*target, *(const float*)u[0], ttype); break;
+                case STR: setVar(*target, *(const std::string*)u[0], ttype); break;
                 default: goto op_ins_error;
             }
             break;
@@ -2340,25 +2313,25 @@ void Script::operation(Line& line)
                 case INT:
                     switch(t[1])
                     {
-                        case INT: ra = *a[0] + *a[1]; break;
-                        case FLOAT: rb = *a[0] + *b[1]; t[0] = FLOAT; break;
-                        case STR: rc = std::to_string(*a[0]) + *c[1]; t[0] = STR; break;
+                        case INT: setVar(*target, *(const int*)u[0] + *(const int*)u[1], ttype); break;
+                        case FLOAT: setVar(*target, *(const int*)u[0] + *(const float*)u[1], ttype); break;
+                        case STR: setVar(*target, std::to_string(*(const int*)u[0]) + *(const std::string*)u[1], ttype); break;
                     }
                     break;
                 case FLOAT:
                     switch(t[1])
                     {
-                        case INT: rb = *b[0] + *a[1]; break;
-                        case FLOAT: rb = *b[0] + *b[1]; break;
-                        case STR: rc = std::to_string(*b[0]) + *c[1]; t[0] = STR; break;
+                        case INT: setVar(*target, *(const float*)u[0] + *(const int*)u[1], ttype); break;
+                        case FLOAT: setVar(*target, *(const float*)u[0] + *(const float*)u[1], ttype); break;
+                        case STR: setVar(*target, std::to_string(*(const float*)u[0]) + *(const std::string*)u[1], ttype); break;
                     }
                     break;
                 case STR:
                     switch(t[1])
                     {
-                        case INT: rc = *c[0] + std::to_string(*a[1]); break;
-                        case FLOAT: rc = *c[0] + std::to_string(*b[1]); break;
-                        case STR: rc = *c[0] + *c[1]; break;
+                        case INT: setVar(*target, *(const std::string*)u[0] + std::to_string(*(const int*)u[1]), ttype); break;
+                        case FLOAT: setVar(*target, *(const std::string*)u[0] + std::to_string(*(const float*)u[1]), ttype); break;
+                        case STR: setVar(*target, *(const std::string*)u[0] + *(const std::string*)u[1], ttype); break;
                     }
                     break;
             }
@@ -2368,8 +2341,8 @@ void Script::operation(Line& line)
             {
                 switch(t[0])
                 {
-                    case INT: ra = - *a[0]; break;
-                    case FLOAT: rb = - *b[0]; break;
+                    case INT: setVar(*target, - *(const int*)u[0], ttype); break;
+                    case FLOAT: setVar(*target, - *(const float*)u[0], ttype); break;
                     case STR: goto op_ins_error;
                     default: goto op_ins_error;
                 }
@@ -2381,16 +2354,16 @@ void Script::operation(Line& line)
                     case INT:
                         switch(t[1])
                         {
-                            case INT: ra = *a[0] - *a[1]; break;
-                            case FLOAT: rb = *a[0] - *b[1]; t[0] = FLOAT; break;
+                            case INT: setVar(*target, *(const int*)u[0] - *(const int*)u[1], ttype); break;
+                            case FLOAT: setVar(*target, *(const int*)u[0] - *(const float*)u[1], ttype); break;
                             case STR: goto op_ins_error;
                         }
                         break;
                     case FLOAT:
                         switch(t[1])
                         {
-                            case INT: rb = *b[0] - *a[1]; break;
-                            case FLOAT: rb = *b[0] - *b[1]; break;
+                            case INT: setVar(*target, *(const float*)u[0] - *(const int*)u[1], ttype); break;
+                            case FLOAT: setVar(*target, *(const float*)u[0] - *(const float*)u[1], ttype); break;
                             case STR: goto op_ins_error;
                         }
                         break;
@@ -2404,16 +2377,16 @@ void Script::operation(Line& line)
                 case INT:
                     switch(t[1])
                     {
-                        case INT: ra = *a[0] * *a[1]; break;
-                        case FLOAT: rb = *a[0] * *b[1]; t[0] = FLOAT; break;
+                        case INT: setVar(*target, *(const int*)u[0] * *(const int*)u[1], ttype); break;
+                        case FLOAT: setVar(*target, *(const int*)u[0] * *(const float*)u[1], ttype); break;
                         case STR: goto op_ins_error;
                     }
                     break;
                 case FLOAT:
                     switch(t[1])
                     {
-                        case INT: rb = *b[0] * *a[1]; break;
-                        case FLOAT: rb = *b[0] * *b[1]; break;
+                        case INT: setVar(*target, *(const float*)u[0] * *(const int*)u[1], ttype); break;
+                        case FLOAT: setVar(*target, *(const float*)u[0] * *(const float*)u[1], ttype); break;
                         case STR: goto op_ins_error;
                     }
                     break;
@@ -2426,16 +2399,16 @@ void Script::operation(Line& line)
                 case INT:
                     switch(t[1])
                     {
-                        case INT: if(*a[1] == 0) goto op_div_error; ra = *a[0] / *a[1]; break;
-                        case FLOAT: if(*b[1] == 0.f) goto op_div_error; rb = *a[0] / *b[1]; t[0] = FLOAT; break;
+                        case INT: if(*(const int*)u[1] == 0) goto op_div_error; setVar(*target, *(const int*)u[0] / *(const int*)u[1], ttype); break;
+                        case FLOAT: if(*(const float*)u[1] == 0.f) goto op_div_error; setVar(*target, *(const int*)u[0] / *(const float*)u[1], ttype); break;
                         case STR: goto op_ins_error;
                     }
                     break;
                 case FLOAT:
                     switch(t[1])
                     {
-                        case INT: if(*a[1] == 0) goto op_div_error; rb = *b[0] / *a[1]; break;
-                        case FLOAT: if(*b[1] == 0.f) goto op_div_error; rb = *b[0] / *b[1]; break;
+                        case INT: if(*(const int*)u[1] == 0) goto op_div_error; setVar(*target, *(const float*)u[0] / *(const int*)u[1], ttype); break;
+                        case FLOAT: if(*(const float*)u[1] == 0.f) goto op_div_error; setVar(*target, *(const float*)u[0] / *(const float*)u[1], ttype); break;
                         case STR: goto op_ins_error;
                     }
                     break;
@@ -2448,7 +2421,7 @@ void Script::operation(Line& line)
                 case INT:
                     switch(t[1])
                     {
-                        case INT: if(*a[1] == 0) goto op_div_error; ra = *a[0] % *a[1]; break;
+                        case INT: if(*(const int*)u[1] == 0) goto op_div_error; setVar(*target, *(const int*)u[0] % *(const int*)u[1], ttype); break;
                         case FLOAT: goto op_ins_error;
                         case STR: goto op_ins_error;
                     }
@@ -2460,9 +2433,9 @@ void Script::operation(Line& line)
         case 5: // !
             switch(t[0])
             {
-                case INT: ra = (*a[0] == 0); break;
-                case FLOAT: ra = (*b[0] == 0.f); t[0] = INT; break;
-                case STR: ra = c[0]->empty(); t[0] = INT; break;
+                case INT: setVar(*target, (*(const int*)u[0] == 0), ttype); break;
+                case FLOAT: setVar(*target, (*(const float*)u[0] == 0.f), ttype); break;
+                case STR: setVar(*target, ((const std::string*)u[0])->empty(), ttype); break;
                 default: goto op_ins_error;
             }
             break;
@@ -2472,25 +2445,25 @@ void Script::operation(Line& line)
                 case INT:
                     switch(t[1])
                     {
-                        case INT: ra = *a[0] != *a[1]; break;
-                        case FLOAT: ra = *a[0] != (int)*b[1]; t[0] = INT; break;
-                        case STR: ra = 0; t[0] = INT; break;
+                        case INT: setVar(*target, *(const int*)u[0] != *(const int*)u[1], ttype); break;
+                        case FLOAT: setVar(*target, *(const int*)u[0] != *(const float*)u[1], ttype); break;
+                        case STR: setVar(*target, 0, ttype); break;
                     }
                     break;
                 case FLOAT:
                     switch(t[1])
                     {
-                        case INT: ra = *b[0] != (int)*a[1]; t[0] = INT; break;
-                        case FLOAT: ra = *b[0] != *b[1]; t[0] = INT; break;
-                        case STR: ra = 0; t[0] = STR; break;
+                        case INT: setVar(*target, *(const float*)u[0] != *(const int*)u[1], ttype); break;
+                        case FLOAT: setVar(*target, *(const float*)u[0] != *(const float*)u[1], ttype); break;
+                        case STR: setVar(*target, 0, ttype); break;
                     }
                     break;
                 case STR:
                     switch(t[1])
                     {
-                        case INT: ra = 0; t[0] = STR; break;
-                        case FLOAT: ra = 0; t[0] = STR; break;
-                        case STR: rc = *c[0] != *c[1]; break;
+                        case INT: setVar(*target, 0, ttype); break;
+                        case FLOAT: setVar(*target, 0, ttype); break;
+                        case STR: setVar(*target, *(const std::string*)u[0] != *(const std::string*)u[1], ttype); break;
                     }
                     break;
             }
@@ -2501,25 +2474,25 @@ void Script::operation(Line& line)
                 case INT:
                     switch(t[1])
                     {
-                        case INT: ra = *a[0] > *a[1]; break;
-                        case FLOAT: ra = *a[0] > (int)*b[1]; t[0] = INT; break;
-                        case STR: ra = 0; t[0] = INT; break;
+                        case INT: setVar(*target, *(const int*)u[0] > *(const int*)u[1], ttype); break;
+                        case FLOAT: setVar(*target, *(const int*)u[0] > *(const float*)u[1], ttype); break;
+                        case STR: setVar(*target, 0, ttype); break;
                     }
                     break;
                 case FLOAT:
                     switch(t[1])
                     {
-                        case INT: ra = *b[0] > (int)*a[1]; t[0] = INT; break;
-                        case FLOAT: ra = *b[0] > *b[1]; t[0] = INT; break;
-                        case STR: ra = 0; t[0] = STR; break;
+                        case INT: setVar(*target, *(const float*)u[0] > *(const int*)u[1], ttype); break;
+                        case FLOAT: setVar(*target, *(const float*)u[0] > *(const float*)u[1], ttype); break;
+                        case STR: setVar(*target, 0, ttype); break;
                     }
                     break;
                 case STR:
                     switch(t[1])
                     {
-                        case INT: ra = 0; t[0] = STR; break;
-                        case FLOAT: ra = 0; t[0] = STR; break;
-                        case STR: rc = *c[0] > *c[1]; break;
+                        case INT: setVar(*target, 0, ttype); break;
+                        case FLOAT: setVar(*target, 0, ttype); break;
+                        case STR: setVar(*target, *(const std::string*)u[0] > *(const std::string*)u[1], ttype); break;
                     }
                     break;
             }
@@ -2530,25 +2503,25 @@ void Script::operation(Line& line)
                 case INT:
                     switch(t[1])
                     {
-                        case INT: ra = *a[0] < *a[1]; break;
-                        case FLOAT: ra = *a[0] < (int)*b[1]; t[0] = INT; break;
-                        case STR: ra = 0; t[0] = INT; break;
+                        case INT: setVar(*target, *(const int*)u[0] < *(const int*)u[1], ttype); break;
+                        case FLOAT: setVar(*target, *(const int*)u[0] < *(const float*)u[1], ttype); break;
+                        case STR: setVar(*target, 0, ttype); break;
                     }
                     break;
                 case FLOAT:
                     switch(t[1])
                     {
-                        case INT: ra = *b[0] < (int)*a[1]; t[0] = INT; break;
-                        case FLOAT: ra = *b[0] < *b[1]; t[0] = INT; break;
-                        case STR: ra = 0; t[0] = STR; break;
+                        case INT: setVar(*target, *(const float*)u[0] < *(const int*)u[1], ttype); break;
+                        case FLOAT: setVar(*target, *(const float*)u[0] < *(const float*)u[1], ttype); break;
+                        case STR: setVar(*target, 0, ttype); break;
                     }
                     break;
                 case STR:
                     switch(t[1])
                     {
-                        case INT: ra = 0; t[0] = STR; break;
-                        case FLOAT: ra = 0; t[0] = STR; break;
-                        case STR: rc = *c[0] < *c[1]; break;
+                        case INT: setVar(*target, 0, ttype); break;
+                        case FLOAT: setVar(*target, 0, ttype); break;
+                        case STR: setVar(*target, *(const std::string*)u[0] < *(const std::string*)u[1], ttype); break;
                     }
                     break;
             }
@@ -2559,25 +2532,25 @@ void Script::operation(Line& line)
                 case INT:
                     switch(t[1])
                     {
-                        case INT: ra = *a[0] >= *a[1]; break;
-                        case FLOAT: ra = *a[0] >= (int)*b[1]; t[0] = INT; break;
-                        case STR: ra = 0; t[0] = INT; break;
+                        case INT: setVar(*target, *(const int*)u[0] >= *(const int*)u[1], ttype); break;
+                        case FLOAT: setVar(*target, *(const int*)u[0] >= *(const float*)u[1], ttype); break;
+                        case STR: setVar(*target, 0, ttype); break;
                     }
                     break;
                 case FLOAT:
                     switch(t[1])
                     {
-                        case INT: ra = *b[0] >= (int)*a[1]; t[0] = INT; break;
-                        case FLOAT: ra = *b[0] >= *b[1]; t[0] = INT; break;
-                        case STR: ra = 0; t[0] = STR; break;
+                        case INT: setVar(*target, *(const float*)u[0] >= *(const int*)u[1], ttype); break;
+                        case FLOAT: setVar(*target, *(const float*)u[0] >= *(const float*)u[1], ttype); break;
+                        case STR: setVar(*target, 0, ttype); break;
                     }
                     break;
                 case STR:
                     switch(t[1])
                     {
-                        case INT: ra = 0; t[0] = STR; break;
-                        case FLOAT: ra = 0; t[0] = STR; break;
-                        case STR: rc = *c[0] >= *c[1]; break;
+                        case INT: setVar(*target, 0, ttype); break;
+                        case FLOAT: setVar(*target, 0, ttype); break;
+                        case STR: setVar(*target, *(const std::string*)u[0] >= *(const std::string*)u[1], ttype); break;
                     }
                     break;
             }
@@ -2588,25 +2561,25 @@ void Script::operation(Line& line)
                 case INT:
                     switch(t[1])
                     {
-                        case INT: ra = *a[0] <= *a[1]; break;
-                        case FLOAT: ra = *a[0] <= (int)*b[1]; t[0] = INT; break;
-                        case STR: ra = 0; t[0] = INT; break;
+                        case INT: setVar(*target, *(const int*)u[0] <= *(const int*)u[1], ttype); break;
+                        case FLOAT: setVar(*target, *(const int*)u[0] <= *(const float*)u[1], ttype); break;
+                        case STR: setVar(*target, 0, ttype); break;
                     }
                     break;
                 case FLOAT:
                     switch(t[1])
                     {
-                        case INT: ra = *b[0] <= (int)*a[1]; t[0] = INT; break;
-                        case FLOAT: ra = *b[0] <= *b[1]; t[0] = INT; break;
-                        case STR: ra = 0; t[0] = STR; break;
+                        case INT: setVar(*target, *(const float*)u[0] <= *(const int*)u[1], ttype); break;
+                        case FLOAT: setVar(*target, *(const float*)u[0] <= *(const float*)u[1], ttype); break;
+                        case STR: setVar(*target, 0, ttype); break;
                     }
                     break;
                 case STR:
                     switch(t[1])
                     {
-                        case INT: ra = 0; t[0] = STR; break;
-                        case FLOAT: ra = 0; t[0] = STR; break;
-                        case STR: rc = *c[0] <= *c[1]; break;
+                        case INT: setVar(*target, 0, ttype); break;
+                        case FLOAT: setVar(*target, 0, ttype); break;
+                        case STR: setVar(*target, *(const std::string*)u[0] <= *(const std::string*)u[1], ttype); break;
                     }
                     break;
             }
@@ -2617,36 +2590,36 @@ void Script::operation(Line& line)
                 case INT:
                     switch(t[1])
                     {
-                        case INT: ra = *a[0] == *a[1]; break;
-                        case FLOAT: ra = *a[0] == (int)*b[1]; t[0] = INT; break;
-                        case STR: ra = 0; t[0] = INT; break;
+                        case INT: setVar(*target, *(const int*)u[0] == *(const int*)u[1], ttype); break;
+                        case FLOAT: setVar(*target, *(const int*)u[0] == *(const float*)u[1], ttype); break;
+                        case STR: setVar(*target, 0, ttype); break;
                     }
                     break;
                 case FLOAT:
                     switch(t[1])
                     {
-                        case INT: ra = *b[0] == (int)*a[1]; t[0] = INT; break;
-                        case FLOAT: ra = *b[0] == *b[1]; t[0] = INT; break;
-                        case STR: ra = 0; t[0] = STR; break;
+                        case INT: setVar(*target, *(const float*)u[0] == *(const int*)u[1], ttype); break;
+                        case FLOAT: setVar(*target, *(const float*)u[0] == *(const float*)u[1], ttype); break;
+                        case STR: setVar(*target, 0, ttype); break;
                     }
                     break;
                 case STR:
                     switch(t[1])
                     {
-                        case INT: ra = 0; t[0] = STR; break;
-                        case FLOAT: ra = 0; t[0] = STR; break;
-                        case STR: rc = *c[0] == *c[1]; break;
+                        case INT: setVar(*target, 0, ttype); break;
+                        case FLOAT: setVar(*target, 0, ttype); break;
+                        case STR: setVar(*target, *(const std::string*)u[0] == *(const std::string*)u[1], ttype); break;
                     }
                     break;
             }
             break;
-        case 12: // ^
+        case 12: // &
             switch(t[0])
             {
                 case INT:
                     switch(t[1])
                     {
-                        case INT: ra = *a[0] ^ *a[1]; break;
+                        case INT: setVar(*target, *(const int*)u[0] & *(const int*)u[1], ttype); break;
                         case FLOAT: goto op_ins_error;
                         case STR: goto op_ins_error;
                     }
@@ -2655,13 +2628,28 @@ void Script::operation(Line& line)
                 case STR: goto op_ins_error;
             }
             break;
-        case 13: // |
+        case 13: // ^
             switch(t[0])
             {
                 case INT:
                     switch(t[1])
                     {
-                        case INT: ra = *a[0] | *a[1]; break;
+                        case INT: setVar(*target, *(const int*)u[0] ^ *(const int*)u[1], ttype); break;
+                        case FLOAT: goto op_ins_error;
+                        case STR: goto op_ins_error;
+                    }
+                    break;
+                case FLOAT:  goto op_ins_error;
+                case STR: goto op_ins_error;
+            }
+            break;
+        case 14: // |
+            switch(t[0])
+            {
+                case INT:
+                    switch(t[1])
+                    {
+                        case INT: setVar(*target, *(const int*)u[0] | *(const int*)u[1], ttype); break;
                         case FLOAT: goto op_ins_error;
                         case STR: goto op_ins_error;
                     }
@@ -2676,25 +2664,25 @@ void Script::operation(Line& line)
                 case INT:
                     switch(t[1])
                     {
-                        case INT: ra = (*a[0] != 0) && (*a[1] != 0); break;
-                        case FLOAT: ra = (*a[0] != 0) && (*b[1] != 0.f); t[0] = INT; break;
-                        case STR: ra = (*a[0] != 0) && (!c[1]->empty()); t[0] = INT; break;
+                        case INT: setVar(*target, (*(const int*)u[0] != 0) && (*(const int*)u[1] != 0), ttype); break;
+                        case FLOAT: setVar(*target, (*(const int*)u[0] != 0) && (*(const float*)u[1] != 0.f), ttype); break;
+                        case STR: setVar(*target, (*(const int*)u[0] != 0) && (!((const std::string*)u[1])->empty()), ttype); break;
                     }
                     break;
                 case FLOAT:
                     switch(t[1])
                     {
-                        case INT: ra = (*b[0] != 0.f) && (*a[1] != 0); t[0] = INT; break;
-                        case FLOAT: ra = (*b[0] != 0.f) && (*b[1] != 0.f); t[0] = INT; break;
-                        case STR: ra = (*b[0] != 0.f) && (!c[1]->empty()); t[0] = INT; break;
+                        case INT: setVar(*target, (*(const float*)u[0] != 0) && (*(const int*)u[1] != 0), ttype); break;
+                        case FLOAT: setVar(*target, (*(const float*)u[0] != 0) && (*(const float*)u[1] != 0.f), ttype); break;
+                        case STR: setVar(*target, (*(const float*)u[0] != 0) && (!((const std::string*)u[1])->empty()), ttype); break;
                     }
                     break;
                 case STR:
                     switch(t[1])
                     {
-                        case INT: ra = (!c[0]->empty()) && (*a[1] != 0); t[0] = INT; break;
-                        case FLOAT: ra = (!c[0]->empty()) && (*b[1] != 0.f); t[0] = INT; break;
-                        case STR: ra = (!c[0]->empty()) && (!c[1]->empty()); t[0] = INT; break;
+                        case INT: setVar(*target, (!((const std::string*)u[0])->empty()) && (*(const int*)u[1] != 0), ttype); break;
+                        case FLOAT: setVar(*target, (!((const std::string*)u[0])->empty()) && (*(const float*)u[1] != 0.f), ttype); break;
+                        case STR: setVar(*target, (!((const std::string*)u[0])->empty()) && (!((const std::string*)u[1])->empty()), ttype); break;
                     }
                     break;
             }
@@ -2705,25 +2693,25 @@ void Script::operation(Line& line)
                 case INT:
                     switch(t[1])
                     {
-                        case INT: ra = (*a[0] != 0) != (*a[1] != 0); break;
-                        case FLOAT: ra = (*a[0] != 0) != (*b[1] != 0.f); t[0] = INT; break;
-                        case STR: ra = (*a[0] != 0) != (!c[1]->empty()); t[0] = INT; break;
+                        case INT: setVar(*target, (*(const int*)u[0] != 0) != (*(const int*)u[1] != 0), ttype); break;
+                        case FLOAT: setVar(*target, (*(const int*)u[0] != 0) != (*(const float*)u[1] != 0.f), ttype); break;
+                        case STR: setVar(*target, (*(const int*)u[0] != 0) != (!((const std::string*)u[1])->empty()), ttype); break;
                     }
                     break;
                 case FLOAT:
                     switch(t[1])
                     {
-                        case INT: ra = (*b[0] != 0.f) != (*a[1] != 0); t[0] = INT; break;
-                        case FLOAT: ra = (*b[0] != 0.f) != (*b[1] != 0.f); t[0] = INT; break;
-                        case STR: ra = (*b[0] != 0.f) != (!c[1]->empty()); t[0] = INT; break;
+                        case INT: setVar(*target, (*(const float*)u[0] != 0) != (*(const int*)u[1] != 0), ttype); break;
+                        case FLOAT: setVar(*target, (*(const float*)u[0] != 0) != (*(const float*)u[1] != 0.f), ttype); break;
+                        case STR: setVar(*target, (*(const float*)u[0] != 0) != (!((const std::string*)u[1])->empty()), ttype); break;
                     }
                     break;
                 case STR:
                     switch(t[1])
                     {
-                        case INT: ra = (!c[0]->empty()) != (*a[1] != 0); t[0] = INT; break;
-                        case FLOAT: ra = (!c[0]->empty()) != (*b[1] != 0.f); t[0] = INT; break;
-                        case STR: ra = (!c[0]->empty()) != (!c[1]->empty()); t[0] = INT; break;
+                        case INT: setVar(*target, (!((const std::string*)u[0])->empty()) != (*(const int*)u[1] != 0), ttype); break;
+                        case FLOAT: setVar(*target, (!((const std::string*)u[0])->empty()) != (*(const float*)u[1] != 0.f), ttype); break;
+                        case STR: setVar(*target, (!((const std::string*)u[0])->empty()) != (!((const std::string*)u[1])->empty()), ttype); break;
                     }
                     break;
             }
@@ -2734,25 +2722,25 @@ void Script::operation(Line& line)
                 case INT:
                     switch(t[1])
                     {
-                        case INT: ra = (*a[0] != 0) || (*a[1] != 0); break;
-                        case FLOAT: ra = (*a[0] != 0) || (*b[1] != 0.f); t[0] = INT; break;
-                        case STR: ra = (*a[0] != 0) || (!c[1]->empty()); t[0] = INT; break;
+                        case INT: setVar(*target, (*(const int*)u[0] != 0) || (*(const int*)u[1] != 0), ttype); break;
+                        case FLOAT: setVar(*target, (*(const int*)u[0] != 0) || (*(const float*)u[1] != 0.f), ttype); break;
+                        case STR: setVar(*target, (*(const int*)u[0] != 0) || (!((const std::string*)u[1])->empty()), ttype); break;
                     }
                     break;
                 case FLOAT:
                     switch(t[1])
                     {
-                        case INT: ra = (*b[0] != 0.f) || (*a[1] != 0); t[0] = INT; break;
-                        case FLOAT: ra = (*b[0] != 0.f) || (*b[1] != 0.f); t[0] = INT; break;
-                        case STR: ra = (*b[0] != 0.f) || (!c[1]->empty()); t[0] = INT; break;
+                        case INT: setVar(*target, (*(const float*)u[0] != 0) || (*(const int*)u[1] != 0), ttype); break;
+                        case FLOAT: setVar(*target, (*(const float*)u[0] != 0) || (*(const float*)u[1] != 0.f), ttype); break;
+                        case STR: setVar(*target, (*(const float*)u[0] != 0) || (!((const std::string*)u[1])->empty()), ttype); break;
                     }
                     break;
                 case STR:
                     switch(t[1])
                     {
-                        case INT: ra = (!c[0]->empty()) || (*a[1] != 0); t[0] = INT; break;
-                        case FLOAT: ra = (!c[0]->empty()) || (*b[1] != 0.f); t[0] = INT; break;
-                        case STR: ra = (!c[0]->empty()) || (!c[1]->empty()); t[0] = INT; break;
+                        case INT: setVar(*target, (!((const std::string*)u[0])->empty()) || (*(const int*)u[1] != 0), ttype); break;
+                        case FLOAT: setVar(*target, (!((const std::string*)u[0])->empty()) || (*(const float*)u[1] != 0.f), ttype); break;
+                        case STR: setVar(*target, (!((const std::string*)u[0])->empty()) || (!((const std::string*)u[1])->empty()), ttype); break;
                     }
                     break;
             }
@@ -2760,8 +2748,8 @@ void Script::operation(Line& line)
         case 18: // ++
             switch(t[0])
             {
-                case INT: ra = *a[0] + 1; break;
-                case FLOAT: rb = *b[0] + 1; break;
+                case INT: setVar(*target, (*(const int*)u[0] != 0)+1, ttype); break;
+                case FLOAT: setVar(*target, (*(const float*)u[0] != 0)+1, ttype); break;
                 case STR: goto op_ins_error;
                 default: goto op_ins_error;
             }
@@ -2769,22 +2757,14 @@ void Script::operation(Line& line)
         case 19: // --
             switch(t[0])
             {
-                case INT: ra = *a[0] - 1; break;
-                case FLOAT: rb = *b[0] - 1; break;
+                case INT: setVar(*target, (*(const int*)u[0] != 0)-1, ttype); break;
+                case FLOAT: setVar(*target, (*(const float*)u[0] != 0)-1, ttype); break;
                 case STR: goto op_ins_error;
                 default: goto op_ins_error;
             }
             break;
         default:
             goto op_ins_error;
-    }
-
-    switch(t[0])
-    {
-        case INT: setVar(*target, ra, ttype); break;
-        case FLOAT: setVar(*target, rb, ttype); break;
-        case STR: setVar(*target, rc, ttype); break;
-        default: goto op_ins_error;
     }
 
     return;
