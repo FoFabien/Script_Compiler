@@ -14,7 +14,7 @@
 //***************************************************************************************************************
 // COMPILE
 //***************************************************************************************************************
-enum {INVALID, STR, INT, FLOAT, OPERATOR, LBRK, RBRK, COMMA, LCUR, RCUR, FUNC, VAR, RESULT, CVAR, COP, CFUNC, GFUNC, TBD};
+enum {INVALID, STR, INT, FLOAT, OPERATOR, LBRK, RBRK, COMMA, LCUR, RCUR, FUNC, VAR, RESULT, CVAR, COP, CFUNC, GFUNC, GVAR, TBD};
 enum {UNDEF, PREFIX, INFIX, POSTFIX};
 
 class Token
@@ -159,6 +159,9 @@ class Script
         static bool compile(const std::string& file, const std::string& output, const char &flag = NONE);
 
         static void addGlobalFunction(const std::string& name, Callback callback, const size_t &argn);
+        static void initGlobalVariables(const size_t& n);
+        static std::vector<Value>& getGlobalVariables();
+        static void clearGlobalVariables();
 
         static void _if(Script* s, Line& l);
         static void _else(Script* s, Line& l);

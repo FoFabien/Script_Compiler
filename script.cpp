@@ -7,6 +7,7 @@
 
 static std::unordered_map<std::string, size_t> gl_func = {{"if", 1}, {"else", 0}, {"elif", 1}, {"return", 1}, {"while", 1}, {"print", 1}, {"debug", 1}, {"break", 0}};
 static std::unordered_map<std::string, Callback> gl_callback = {{"if", Script::_if}, {"else", Script::_else}, {"elif", Script::_if}, {"return", Script::_return}, {"while", Script::_while}, {"print", Script::_print}, {"debug", Script::_debug}, {"break", Script::_break}};
+static std::vector<Value> globalVars;
 #define SCRIPT_MAGIC 0x89191500
 
 //***************************************************************************************************************
@@ -49,6 +50,8 @@ int detectType(const std::string &s)
     if(s.size() >= 2 && s[0] == '"' && s.back() == '"')
         return 0; // string
 
+    if(s.empty()) return -1;
+
     if(isdigit(s[0]) || s[0] == '-')
     {
         char dot = 0;
@@ -72,6 +75,15 @@ int detectType(const std::string &s)
             }
         }
         return (dot == 1 ? 2 : 1); // float : int
+    }
+    else if(s[0] == '@')
+    {
+        if(s.size() == 1) return -1;
+        for(size_t i = 1; i < s.size(); ++i)
+        {
+            if(!std::isdigit(s[i])) return -1;
+        }
+        return 4; // gvar
     }
     else
     {
@@ -165,7 +177,7 @@ Token* Token::make(const std::string& s, const int& t, const int& o)
     tk->o = o;
     switch(t)
     {
-        case INT: case RESULT: case CVAR: case COP:
+        case INT: case RESULT: case CVAR: case COP: case GVAR:
             tk->i = std::stod(s);
             break;
         case FLOAT:
@@ -193,7 +205,7 @@ Token* Token::make(Token &cpy)
 
 bool Token::isIntValue() const
 {
-    return (t == INT || t == RESULT || t == CVAR || t == COP);
+    return (t == INT || t == RESULT || t == CVAR || t == COP || t == GVAR);
 }
 
 bool Token::isFloatValue() const
@@ -254,14 +266,14 @@ bool Token::operator==(const Token& rhs)
     if(o != rhs.o) return false;
     switch(t)
     {
-        case INT: case RESULT: case CVAR: case COP:
+        case INT: case RESULT: case CVAR: case COP: case GVAR:
             return (i == rhs.i);
         case FLOAT:
             return (f == rhs.f);
         case STR: case OPERATOR: case LBRK: case RBRK: case COMMA: case LCUR: case RCUR: case FUNC: case VAR: case TBD:
             return (s == rhs.s);
         default:
-            return true;
+            return false;
     }
 }
 
@@ -286,7 +298,7 @@ void Value::clear()
         case FUNC: case STR:
             delete (std::string*)p;
             break;
-        case INT: case COP: case RESULT: case CVAR: case CFUNC:
+        case INT: case COP: case RESULT: case CVAR: case CFUNC: case GVAR:
             delete (int*)p;
             break;
         case FLOAT:
@@ -311,7 +323,7 @@ bool Value::set(const void *any, const int& type)
             case FUNC: case STR:
                 p = new std::string(((std::string*)any)->c_str());
                 break;
-            case INT: case COP: case RESULT: case CVAR: case CFUNC:
+            case INT: case COP: case RESULT: case CVAR: case CFUNC: case GVAR:
                 p = new int(*(const int*)any);
                 break;
             case FLOAT:
@@ -334,7 +346,7 @@ bool Value::set(const void *any, const int& type)
             case FUNC: case STR:
                 (*(std::string*)p) = ((const std::string*)any)->c_str();
                 break;
-            case INT: case COP: case RESULT: case CVAR: case CFUNC:
+            case INT: case COP: case RESULT: case CVAR: case CFUNC: case GVAR:
                 (*(int*)p) = (*(const int*)any);
                 break;
             case FLOAT:
@@ -405,7 +417,7 @@ bool Value::operator==(const Value& rhs)
     if(t != rhs.t) return false;
     switch(t)
     {
-        case INT: case RESULT: case CVAR: case COP:
+        case INT: case RESULT: case CVAR: case COP: case GVAR: case CFUNC: case GFUNC:
             return (*(int*)p == *(int*)rhs.p);
         case FLOAT:
             return (*(float*)p == *(float*)rhs.p);
@@ -567,13 +579,13 @@ bool Script::load(const std::string& file)
                         }
                         xj.set(&buf, STR);
                         break;
-                    case INT: case RESULT: case CVAR:
+                    case INT: case RESULT: case CVAR: case GVAR:
                         f.read((char*)&tmp, 4);
                         xj.set(&tmp, c);
                         break;
                     case FLOAT:
                         f.read((char*)&fv, 4);
-                        xj.set(&fv, FLOAT);
+                        xj.set(fv);
                         break;
                     default: break;
                 }
@@ -712,6 +724,7 @@ void Script::setVar(const int& i, const int& v, const int &type)
     {
         case RESULT: p = &(currentRegs[i]); break;
         case CVAR: p = &(currentVars[i]); break;
+        case GVAR: p = &(globalVars[i]); break;
         default: setError("setVar(int) error"); return;
     }
     if(!p->set(v))
@@ -725,6 +738,7 @@ void Script::setVar(const int& i, const std::string& v, const int &type)
     {
         case RESULT: p = &(currentRegs[i]); break;
         case CVAR: p = &(currentVars[i]); break;
+        case GVAR: p = &(globalVars[i]); break;
         default: setError("setVar(string) error"); return;
     }
     if(!p->set(v))
@@ -738,6 +752,7 @@ void Script::setVar(const int& i, const float& v, const int &type)
     {
         case RESULT: p = &(currentRegs[i]); break;
         case CVAR: p = &(currentVars[i]); break;
+        case GVAR: p = &(globalVars[i]); break;
         default: setError("setVar(float) error"); return;
     }
     if(!p->set(v))
@@ -751,6 +766,7 @@ void Script::setVar(const int& i, const Value& v, const int &type)
     {
         case RESULT: p = &(currentRegs[i]); break;
         case CVAR: p = &(currentVars[i]); break;
+        case GVAR: p = &(globalVars[i]); break;
         default: setError("setVar(Value) error"); return;
     }
     if(!p->set(v.getP(), v.getType()))
@@ -763,6 +779,7 @@ Value& Script::getVar(const int& i, const int &type)
     {
         case RESULT: return currentRegs[i];
         case CVAR: return currentVars[i];
+        case GVAR: return globalVars[i];
         default: setError("getVar() error"); return code[id].line[pc].op;
     }
 }
@@ -773,7 +790,7 @@ const void* Script::getValueContent(const Value& v, int &type)
     switch(v.getType())
     {
         case INT: case FLOAT: case STR: p = v.getP(); type = v.getType(); break;
-        case CVAR: case RESULT:
+        case CVAR: case RESULT: case GVAR:
         {
             Value& w = getVar(*v.get<int>(), v.getType());
             switch(w.getType())
@@ -1000,6 +1017,7 @@ bool Script::compile(const std::string& file, const std::string& output, const c
     bool isnum = false;
     bool iswd = false;
     bool isfl = false;
+    bool isgvar = false;
 
     TokenIDList tokens; // list of tokens after parsing
     Compiled code(20); // resulting code
@@ -1069,7 +1087,7 @@ bool Script::compile(const std::string& file, const std::string& output, const c
                 isnum = false;
                 iswd = false;
                 isfl = false;
-                continue;
+                isgvar = false;
             }
             else if(std::isspace(c)) // a whitespace separates the tokens
             {
@@ -1082,6 +1100,7 @@ bool Script::compile(const std::string& file, const std::string& output, const c
                 isnum = false;
                 iswd = false;
                 isfl = false;
+                isgvar = false;
             }
             else if(std::isalpha(c) || c == '_') // character or _ (it has to be part of a keyword, function or variable)
             {
@@ -1106,10 +1125,25 @@ bool Script::compile(const std::string& file, const std::string& output, const c
                 buf += c;
                 iswd = true;
                 isfl = false;
+                isgvar = false;
+            }
+            else if(c == '@') // @ (global var name)
+            {
+                if(!buf.empty())
+                {
+                    tokens.push_back(buf);
+                    buf.clear();
+                }
+                buf.clear();
+                buf += c;
+                isnum = false;
+                iswd = false;
+                isfl = false;
+                isgvar = true;
             }
             else if(std::isdigit(c)) // digit (part of a keyword but not the first character, int or float)
             {
-                if(!iswd && !isnum)
+                if(!iswd && !isnum && !isgvar)
                 {
                     if(!buf.empty())
                     {
@@ -1139,6 +1173,7 @@ bool Script::compile(const std::string& file, const std::string& output, const c
                     iswd = false;
                     isnum = false;
                     isfl = false;
+                    isgvar = false;
                 }
                 buf += c;
             }
@@ -1153,6 +1188,7 @@ bool Script::compile(const std::string& file, const std::string& output, const c
                 iswd = false;
                 isnum = false;
                 isfl = false;
+                isgvar = false;
                 isstr = true; // enable string mode
                 buf += c;
             }
@@ -1167,6 +1203,7 @@ bool Script::compile(const std::string& file, const std::string& output, const c
                 isnum = false;
                 iswd = false;
                 isfl = false;
+                isgvar = false;
             }
             else if(c == '=') // equal operator
             {
@@ -1193,6 +1230,7 @@ bool Script::compile(const std::string& file, const std::string& output, const c
                 isnum = false;
                 iswd = false;
                 isfl = false;
+                isgvar = false;
             }
             else if(c == '+' || c == '-' || c == '&' || c == '^' || c == '|') // operators which can be doubled (example: ++ )
             {
@@ -1214,6 +1252,7 @@ bool Script::compile(const std::string& file, const std::string& output, const c
                 isnum = false;
                 iswd = false;
                 isfl = false;
+                isgvar = false;
             }
             else /*if(c == '<' || c == '>' || c == '*' || c == '%' || c == '!')*/ // other operators + any unexpected chars (those will trigger an error)
             {
@@ -1226,6 +1265,7 @@ bool Script::compile(const std::string& file, const std::string& output, const c
                 isnum = false;
                 iswd = false;
                 isfl = false;
+                isgvar = false;
             }
         }
         else // string mode
@@ -1417,6 +1457,14 @@ want_operand:
                     goto want_operand;
                 }
                 break;
+            case 4:
+            {
+                std::string buf = it->substr(1);
+                if(std::stoi(buf) >= globalVars.size())
+                    goto sy_gvar_error;
+                output.push_back(Token::make(buf, GVAR));
+                break;
+            }
             default:
                 goto sy_error; // anything else is an error
         }
@@ -1606,6 +1654,10 @@ sy_pp_error:
     std::cout << "post compilation error" << std::endl;
     goto sy_end_error;
 
+sy_gvar_error:
+    std::cout << "invalid global variable id" << std::endl;
+    goto sy_end_error;
+
 sy_error:
     std::cout << "unknown error" << std::endl;
     std::cout << std::endl;
@@ -1700,7 +1752,7 @@ bool Script::format(Program &prog, VariableList &vars, Compiled& code)
                         {
                             case RESULT:
                                 regs[xj[j]->getInt()] = false; // nobreak
-                            case INT: case FLOAT: case STR: case VAR:
+                            case INT: case FLOAT: case STR: case VAR: case GVAR:
                                 ins.params.push_back(Token::make(*xj[j]));
                                 break;
                             default:
@@ -1717,7 +1769,7 @@ bool Script::format(Program &prog, VariableList &vars, Compiled& code)
                         {
                             case RESULT:
                                 regs[xj[j]->getInt()] = false; // nobreak
-                            case INT: case FLOAT: case STR: case VAR:
+                            case INT: case FLOAT: case STR: case VAR: case GVAR:
                                 ins.params.push_back(Token::make(*xj[j]));
                                 break;
                             default:
@@ -1761,7 +1813,7 @@ bool Script::format(Program &prog, VariableList &vars, Compiled& code)
                                 {
                                     case RESULT:
                                         regs[xj[k]->getInt()] = false; // nobreak
-                                    case INT: case FLOAT: case STR: case VAR:
+                                    case INT: case FLOAT: case STR: case VAR: case GVAR:
                                         ins.params.push_back(xj[k]);
                                         break;
                                     default:
@@ -1949,19 +2001,20 @@ bool Script::postprocessing(Compiled& code)
                 case OPERATOR:
                     if(ins[i].op->getString() == "=")
                     {
-                        if(!ins[i].hasResult && (ins[i].params[0]->getType() != VAR && ins[i].params[0]->getType() != RESULT))
+                        int pzt = ins[i].params[0]->getType();
+                        if(!ins[i].hasResult && (pzt != VAR && pzt != RESULT && pzt != GVAR))
                         {
                             ins[i].clear();
                             ins.erase(ins.begin()+i);
                             break;
                         }
-                        else if(ins[i].hasResult && (ins[i].params[0]->getType() == VAR || ins[i].params[0]->getType() == RESULT))
+                        else if(ins[i].hasResult && (pzt == VAR || pzt == RESULT || pzt == GVAR))
                         {
                             replace.push_back({ins[i].params[2], Token::make(*(ins[i].params[0]))});
                             ins[i].params.pop_back();
                             ins[i].hasResult = false;
                         }
-                        if(!ins[i].hasResult && (ins[i].params[0]->getType() == VAR || ins[i].params[0]->getType() == RESULT) && ins[i].params[1]->getType() == RESULT)
+                        if(!ins[i].hasResult && (pzt == VAR || pzt == RESULT || pzt == GVAR) && ins[i].params[1]->getType() == RESULT)
                         {
                             for(int j = i - 1; j >= 0; --j)
                             {
@@ -2005,7 +2058,8 @@ bool Script::postprocessing(Compiled& code)
                         std::string tmp = ins[i].op->getString();
                         if(tmp.size() == 2 && tmp[1] == '=' && tmp[0] != '!' && tmp[0] != '=' && tmp[0] != '>' && tmp[0] != '<')
                         {
-                            if(ins[i].hasResult && (ins[i].params[0]->getType() == VAR || ins[i].params[0]->getType() == RESULT))
+                            int pzt = ins[i].params[0]->getType();
+                            if(ins[i].hasResult && (pzt == VAR || pzt == RESULT || pzt == GVAR))
                             {
                                 replace.push_back({ins[i].params[2], Token::make(*(ins[i].params[0]))});
                                 ins[i].params.pop_back();
@@ -2175,7 +2229,8 @@ void Script::print(Compiled& code)
         {
             std::cout << xl << " -> ";
             ++xl;
-            if(xj.op->getType() == RESULT) std::cout << "@" << xj.op->getInt() << " ";
+            if(xj.op->getType() == RESULT) std::cout << "r" << xj.op->getInt() << " ";
+            else if(xj.op->getType() == GVAR) std::cout << "@" << xj.op->getInt() << " ";
             else if(xj.op->getType() == CVAR) std::cout << "v" << xj.op->getInt() << " ";
             else if(xj.op->isIntValue()) std::cout << xj.op->getInt() << " ";
             else if(xj.op->isFloatValue()) std::cout << xj.op->getFloat() << " ";
@@ -2183,7 +2238,8 @@ void Script::print(Compiled& code)
             std::cout << (xj.hasResult ? "[1] " : "[0] ");
             for(auto j: xj.params)
             {
-                if(j->getType() == RESULT) std::cout << "@" << j->getInt() << " ";
+                if(j->getType() == RESULT) std::cout << "r" << j->getInt() << " ";
+                else if(j->getType() == GVAR) std::cout << "@" << j->getInt() << " ";
                 else if(j->getType() == CVAR) std::cout << "v" << j->getInt() << " ";
                 else if(j->isIntValue()) std::cout << j->getInt() << " ";
                 else if(j->isFloatValue()) std::cout << j->getFloat() << " ";
@@ -2204,7 +2260,8 @@ void Script::debug(Program& code)
         {
             for(auto &k: j)
             {
-                if(k->getType() == RESULT) std::cout << "@" << k->getInt() << " ";
+                if(k->getType() == RESULT) std::cout << "r" << k->getInt() << " ";
+                else if(k->getType() == RESULT) std::cout << "@" << k->getInt() << " ";
                 else if(k->getType() == CVAR) std::cout << "v" << k->getInt() << " ";
                 else if(k->isIntValue()) std::cout << k->getInt() << " ";
                 else if(k->isFloatValue()) std::cout << k->getFloat() << " ";
@@ -2778,6 +2835,7 @@ op_div_error:
 
 int Script::get_while_loop_point()
 {
+    #warning "review this function"
     if(code[id].while_map.find(pc) != code[id].while_map.end())
         return code[id].while_map[pc];
 
@@ -2895,6 +2953,22 @@ void Script::addGlobalFunction(const std::string& name, Callback callback, const
     gl_callback.insert(std::pair<std::string, Callback>(name, callback));
 }
 
+void Script::initGlobalVariables(const size_t& n)
+{
+    globalVars.resize(n);
+}
+
+std::vector<Value>& Script::getGlobalVariables()
+{
+    return globalVars;
+}
+
+void Script::clearGlobalVariables()
+{
+    for(auto &i: globalVars) i.clear();
+    globalVars.clear();
+}
+
 void Script::printValue(const Value& v, const bool& isContent)
 {
     switch(v.getType())
@@ -2902,14 +2976,14 @@ void Script::printValue(const Value& v, const bool& isContent)
         case INT: std::cout << "value -> " << *v.get<int>() << std::endl; break;
         case FLOAT: std::cout << "value -> " << *v.get<float>() << std::endl; break;
         case STR: std::cout << "value -> " << *v.get<std::string>() << std::endl; break;
-        case CVAR: case RESULT:
+        case CVAR: case RESULT: case GVAR:
             if(isContent)
             {
                 std::cout << "error" << std::endl;
             }
             else
             {
-                std::cout << (v.getType() == CVAR ? "variable [" : "register [") << *v.get<int>() << "] -> ";
+                std::cout << (v.getType() == RESULT ? "register [" : "variable [") << (v.getType() == GVAR ? "G" : "") << *v.get<int>() << "] -> ";
                 if(loaded) printValue(getVar(*v.get<int>(), v.getType()), true);
                 else std::cout << "???" << std::endl;
             }
