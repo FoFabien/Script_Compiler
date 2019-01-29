@@ -1412,7 +1412,7 @@ want_operand:
             case 4:
             {
                 std::string buf = it->substr(1);
-                if(std::stoi(buf) >= globalVars.size())
+                if(std::stoul(buf) >= globalVars.size())
                     goto sy_gvar_error;
                 output.push_back(new Token(buf, GVAR));
                 break;

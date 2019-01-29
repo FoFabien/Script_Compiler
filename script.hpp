@@ -26,7 +26,8 @@ struct Token
     Token();
     Token(const std::string& s, const int& t, const int& o = UNDEF);
     Token(Token &cpy);
-    bool isIntValue() const;
+
+    bool isIntValue() const; // isInt() != isNumber()
     bool isFloatValue() const;
     bool isStringValue() const;
     bool isNumber() const;
