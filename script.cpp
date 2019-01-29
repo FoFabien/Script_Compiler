@@ -160,29 +160,21 @@ bool equal_precedence(const std::string &op1, const std::string &op2)
     return op_list.at(op1) == op_list.at(op2);
 }
 
-Token* Token::make(const std::string& s, const int& t, const int& o)
+Token::Token()
 {
-    Token *tk = new Token();
-    tk->t = t;
-    tk->o = o;
-    switch(t)
-    {
-        default:
-            tk->s = s;
-            break;
-        case INVALID:
-            return nullptr;
-    }
-    return tk;
+
 }
 
-Token* Token::make(Token &cpy)
+Token::Token(const std::string& s, const int& t, const int& o): s(s), t(t), o(o)
 {
-    Token *tk = new Token();
-    tk->s = cpy.s;
-    tk->t = cpy.t;
-    tk->o = cpy.o;
-    return tk;
+
+}
+
+Token::Token(Token &cpy)
+{
+    s = cpy.s;
+    t = cpy.t;
+    o = cpy.o;
 }
 
 bool Token::isIntValue() const
@@ -200,14 +192,9 @@ bool Token::isStringValue() const
     return (t == STR);
 }
 
-bool Token::isDigit() const
+bool Token::isNumber() const
 {
     return (t == INT || t == FLOAT);
-}
-
-std::string Token::getString() const
-{
-    return s;
 }
 
 std::string Token::getStrippedString() const
@@ -237,27 +224,9 @@ float Token::getFloat() const
     return std::stof(s);
 }
 
-int Token::getType() const
-{
-    return t;
-}
-
-int Token::getTag() const
-{
-    return o;
-}
-
 bool Token::operator==(const Token& rhs)
 {
-    if(t != rhs.t) return false;
-    if(o != rhs.o) return false;
-    switch(t)
-    {
-        default:
-            return (s == rhs.s);
-        case INVALID:
-            return false;
-    }
+    return (t == rhs.t) && (s == rhs.s) && (o == rhs.o);
 }
 
 //***************************************************************************************************************
@@ -1380,7 +1349,7 @@ line_start: // start of a new "line"
         }
         else
         {
-            prog[last_def].push_back({Token::make(*it, RCUR)});
+            prog[last_def].push_back({new Token(*it, RCUR)});
             --scp;
             ++it;
             goto line_start;
@@ -1398,7 +1367,7 @@ want_operand:
     if(it == tokens.cend()) goto sy_error; // we shouldn't reach the end here
     if(*it == "(" || isPrefixOp(*it)) // kinda explicit
     {
-        stack.push(Token::make(*it, (*it == "(") ? LBRK : OPERATOR, PREFIX)); // push to the stack
+        stack.push(new Token(*it, (*it == "(") ? LBRK : OPERATOR, PREFIX)); // push to the stack
         ++it;
         goto want_operand;
     }
@@ -1407,7 +1376,7 @@ want_operand:
         #warning ":("
         if(stack.empty()) goto sy_empty_stack;
         tk = stack.top();
-        if(tk->getType() != LBRK) goto sy_error;
+        if(tk->t != LBRK) goto sy_error;
         delete tk;
         stack.pop();
         ++it;
@@ -1418,19 +1387,19 @@ want_operand:
     {
         switch(detectType(*it)) // check what we got and push to the output
         {
-            case 0: output.push_back(Token::make(*it, STR)); break;
-            case 1: output.push_back(Token::make(*it, INT)); break;
-            case 2: output.push_back(Token::make(*it, FLOAT)); break;
+            case 0: output.push_back(new Token(*it, STR)); break;
+            case 1: output.push_back(new Token(*it, INT)); break;
+            case 2: output.push_back(new Token(*it, FLOAT)); break;
             case 3:
                 if(!isFunction(*it, code)) // var
                 {
-                    output.push_back(Token::make(*it, VAR));
+                    output.push_back(new Token(*it, VAR));
                     if(vars[last_def].find(*it) == vars[last_def].end())
                         vars[last_def].insert(*it);
                 }
                 else
                 {
-                    stack.push(Token::make(*it, FUNC)); // function call counts as operators so they are sent to the stack
+                    stack.push(new Token(*it, FUNC)); // function call counts as operators so they are sent to the stack
                     if(*it == "else") // "else" function is a bit special, we don't want (arg1, ..., argN) after
                     {
                         ++it;
@@ -1445,7 +1414,7 @@ want_operand:
                 std::string buf = it->substr(1);
                 if(std::stoi(buf) >= globalVars.size())
                     goto sy_gvar_error;
-                output.push_back(Token::make(buf, GVAR));
+                output.push_back(new Token(buf, GVAR));
                 break;
             }
             default:
@@ -1504,7 +1473,7 @@ have_operand: // explicit
         while(!stack.empty()) // empty the stack
         {
             tk = stack.top();
-            if(tk->getType() == LBRK) // while checking for erros
+            if(tk->t == LBRK) // while checking for erros
             {
                 goto sy_error;
             }
@@ -1517,14 +1486,14 @@ have_operand: // explicit
         if(!output.empty())
         {
             tk = output.back();
-            if(tk->getType() == VAR)
+            if(tk->t == VAR)
             {
-                output.push_back(Token::make(*it, OPERATOR, POSTFIX));
+                output.push_back(new Token(*it, OPERATOR, POSTFIX));
                 ++it;
                 goto have_operand;
             }
         }
-        stack.push(Token::make(*it, OPERATOR, PREFIX));
+        stack.push(new Token(*it, OPERATOR, PREFIX));
         ++it;
         goto want_operand;
     }
@@ -1532,7 +1501,7 @@ have_operand: // explicit
     {
         if(stack.empty()) goto sy_empty_stack;
         tk = stack.top();
-        while(tk->getType() != LBRK)
+        while(tk->t != LBRK)
         {
             output.push_back(tk);
             stack.pop();
@@ -1548,7 +1517,7 @@ have_operand: // explicit
     {
         if(stack.empty()) goto sy_empty_stack;
         tk = stack.top();
-        while(tk->getType() != LBRK)
+        while(tk->t != LBRK)
         {
             output.push_back(tk);
             stack.pop();
@@ -1562,14 +1531,14 @@ have_operand: // explicit
     {
         if(!stack.empty())
             tk = stack.top();
-        while(!stack.empty() && (tk->getType() == FUNC || (tk->getType() == OPERATOR && (greater_precedence(tk->getString(), *it) || (equal_precedence(tk->getString(), *it) && tk->getTag() == PREFIX)) && *it != "^")) && tk->getType() != LBRK)
+        while(!stack.empty() && (tk->t == FUNC || (tk->t == OPERATOR && (greater_precedence(tk->s, *it) || (equal_precedence(tk->s, *it) && tk->o == PREFIX)) && *it != "^")) && tk->t != LBRK)
         {
             stack.pop();
             output.push_back(tk);
             if(!stack.empty())
                 tk = stack.top();
         }
-        stack.push(Token::make(*it, OPERATOR, INFIX));
+        stack.push(new Token(*it, OPERATOR, INFIX));
         ++it;
         goto want_operand;
     }
@@ -1577,7 +1546,7 @@ have_operand: // explicit
     {
         if(stack.empty()) goto sy_error;
         tk = stack.top();
-        if(!isCondition(tk->getString())) goto sy_error;
+        if(!isCondition(tk->s)) goto sy_error;
         while(!stack.empty())
         {
             tk = stack.top();
@@ -1587,7 +1556,7 @@ have_operand: // explicit
         prog[last_def].push_back(output);
         output.clear();
 
-        prog[last_def].push_back({Token::make(*it, LCUR)});
+        prog[last_def].push_back({new Token(*it, LCUR)});
 
         ++scp;
         ++it;
@@ -1599,7 +1568,7 @@ have_operand: // explicit
         while(!stack.empty()) // we empty
         {
             tk = stack.top();
-            if(tk->getType() == LBRK)
+            if(tk->t == LBRK)
             {
                 goto sy_error;
             }
@@ -1679,8 +1648,7 @@ bool Script::format(Program &prog, VariableList &vars, Compiled& code)
         for(auto &xj: xi.second)
         {
             // if markers { and } are directly processed
-            int type = xj[0]->getType();
-            if(xj.size() == 1 && (type == LCUR || type == RCUR))
+            if(xj.size() == 1 && (xj[0]->t == LCUR || xj[0]->t == RCUR))
             {
                 Instruction ins;
                 ins.op = xj[0];
@@ -1689,7 +1657,7 @@ bool Script::format(Program &prog, VariableList &vars, Compiled& code)
                 continue;
             }
             // and single token lines are ignored (excluding functions)
-            else if(xj.size() == 1 && type != FUNC)
+            else if(xj.size() == 1 && xj[0]->t != FUNC)
             {
                 continue;
             }
@@ -1699,20 +1667,20 @@ bool Script::format(Program &prog, VariableList &vars, Compiled& code)
             for(size_t i = 0; i < xj.size(); ++i) // go through tokens
             {
                 // until we find an operator or function call
-                if(xj[i]->getType() == OPERATOR)
+                if(xj[i]->t == OPERATOR)
                 {
-                    if(isSingleOp(xj[i]->getString()) || (xj[i]->getString() == "-" && xj[i]->getTag() == PREFIX))
+                    if(isSingleOp(xj[i]->s) || (xj[i]->s == "-" && xj[i]->o == PREFIX))
                         j = i - 1;
                     else j = i - 2;
                 }
-                else if(xj[i]->getType() == FUNC)
+                else if(xj[i]->t == FUNC)
                 {
-                    auto ast = code.find(xj[i]->getString());
+                    auto ast = code.find(xj[i]->s);
                     if(ast != code.end())
                         j = i - ast->second.argn;
                     else
                     {
-                        auto bst = gl_func.find(xj[i]->getString());
+                        auto bst = gl_func.find(xj[i]->s);
                         if(bst != gl_func.end())
                             j = i - bst->second;
                         else goto fc_misf_error;
@@ -1727,16 +1695,16 @@ bool Script::format(Program &prog, VariableList &vars, Compiled& code)
                 Instruction ins;
                 ins.op = xj[i]; // function/operator
 
-                switch(ins.op->getTag())
+                switch(ins.op->o)
                 {
                     case POSTFIX: // ++ --
                         if(j != i - 1) goto fc_error;
-                        switch(xj[j]->getType())
+                        switch(xj[j]->t)
                         {
                             case RESULT:
                                 regs[xj[j]->getInt()] = false; // nobreak
                             case INT: case FLOAT: case STR: case VAR: case GVAR:
-                                ins.params.push_back(Token::make(*xj[j]));
+                                ins.params.push_back(new Token(*xj[j]));
                                 break;
                             default:
                                 goto fc_para_error;
@@ -1748,18 +1716,18 @@ bool Script::format(Program &prog, VariableList &vars, Compiled& code)
                         break;
                     case PREFIX: // - ! ++ --
                         if(j != i - 1) goto fc_argn_error;
-                        switch(xj[j]->getType())
+                        switch(xj[j]->t)
                         {
                             case RESULT:
                                 regs[xj[j]->getInt()] = false; // nobreak
                             case INT: case FLOAT: case STR: case VAR: case GVAR:
-                                ins.params.push_back(Token::make(*xj[j]));
+                                ins.params.push_back(new Token(*xj[j]));
                                 break;
                             default:
                                 goto fc_para_error;
                                 break;
                         }
-                        switch(op_unordered_map.at(ins.op->getString()))
+                        switch(op_unordered_map.at(ins.op->s))
                         {
                             case 5: case 2: // ! -
                             {
@@ -1771,11 +1739,11 @@ bool Script::format(Program &prog, VariableList &vars, Compiled& code)
                                 if(r == regs.size()) // create a new one if none
                                     regs.push_back(false);
                                 regs[r] = true; // mark the temp variable as non free
-                                ins.params.push_back(Token::make(std::to_string(r), RESULT)); // add the temp variable as an extra parameter
+                                ins.params.push_back(new Token(std::to_string(r), RESULT)); // add the temp variable as an extra parameter
                                 ins.hasResult = true;
                                 code[xi.first].line.push_back(ins); // store the instruction
                                 xj.erase(xj.begin()+j, xj.begin()+i); // remove the used tokens from the RPN lines
-                                xj[j] = Token::make(std::to_string(r), RESULT); // place the temp variable where the used tokens were
+                                xj[j] = new Token(std::to_string(r), RESULT); // place the temp variable where the used tokens were
                                 i = j;
                                 break;
                             }
@@ -1792,7 +1760,7 @@ bool Script::format(Program &prog, VariableList &vars, Compiled& code)
                         if(j >= 0) // store the parameters if any
                             for(size_t k = j; k < i; ++k)
                             {
-                                switch(xj[k]->getType())
+                                switch(xj[k]->t)
                                 {
                                     case RESULT:
                                         regs[xj[k]->getInt()] = false; // nobreak
@@ -1812,12 +1780,12 @@ bool Script::format(Program &prog, VariableList &vars, Compiled& code)
                         if(r == regs.size()) // create a new one if none
                             regs.push_back(false);
 
-                        ins.params.push_back(Token::make(std::to_string(r), RESULT)); // add the temp variable as an extra parameter
+                        ins.params.push_back(new Token(std::to_string(r), RESULT)); // add the temp variable as an extra parameter
                         ins.hasResult = true;
                         regs[r] = true; // mark the temp variable as non free
                         code[xi.first].line.push_back(ins); // store the instruction
                         xj.erase(xj.begin()+j, xj.begin()+i); // remove the used tokens from the RPN lines
-                        xj[j] = Token::make(std::to_string(r), RESULT); // place the temp variable where the used tokens were
+                        xj[j] = new Token(std::to_string(r), RESULT); // place the temp variable where the used tokens were
                         i = j;
                         break;
                     }
@@ -1836,7 +1804,7 @@ bool Script::format(Program &prog, VariableList &vars, Compiled& code)
                     postfixes.erase(postfixes.begin());
                 }while(!postfixes.empty());
             }
-            else if(xj.size() != 1 || xj[0]->getType() != RESULT)
+            else if(xj.size() != 1 || xj[0]->t != RESULT)
                 goto fc_end_error;
         }
     }
@@ -1878,17 +1846,17 @@ int Script::errorCheck(Compiled& code)
         Code& func = xi.second;
         for(auto &xj: func.line)
         {
-            switch(xj.op->getType())
+            switch(xj.op->t)
             {
                 case FUNC:
                 {
                     size_t p;
-                    auto ast = code.find(xj.op->getString());
+                    auto ast = code.find(xj.op->s);
                     if(ast != code.end())
                         p = ast->second.argn;
                     else
                     {
-                        auto bst = gl_func.find(xj.op->getString());
+                        auto bst = gl_func.find(xj.op->s);
                         if(bst != gl_func.end())
                             p = bst->second;
                         else return 3;
@@ -1906,7 +1874,7 @@ int Script::errorCheck(Compiled& code)
             }
             for(auto &xk: xj.params)
             {
-                switch(xk->getType())
+                switch(xk->t)
                 {
                     case FUNC: case OPERATOR: case LCUR: case RCUR:
                         return 2;
@@ -1930,16 +1898,16 @@ bool Script::postprocessing(Compiled& code)
         for(int i = 0; i < (int)ins.size(); ++i)
         {
             // Instruction()
-            switch(ins[i].op->getType())
+            switch(ins[i].op->t)
             {
                 case FUNC:
-                    if(code.find(ins[i].op->getString()) != code.end())
-                        c = code[ins[i].op->getString()].argn;
-                    else if(gl_func.find(ins[i].op->getString()) != gl_func.end())
-                        c = gl_func[ins[i].op->getString()];
+                    if(code.find(ins[i].op->s) != code.end())
+                        c = code[ins[i].op->s].argn;
+                    else if(gl_func.find(ins[i].op->s) != gl_func.end())
+                        c = gl_func[ins[i].op->s];
                     break;
                 case OPERATOR:
-                    if(isSingleOp(ins[i].op->getString()) || (ins[i].op->getString() == "-" && ins[i].op->getTag() == PREFIX))
+                    if(isSingleOp(ins[i].op->s) || (ins[i].op->s == "-" && ins[i].op->o == PREFIX))
                         c = 1;
                     else c = 2;
                     break;
@@ -1960,7 +1928,7 @@ bool Script::postprocessing(Compiled& code)
                 if(ri != replace.size())
                 {
                     delete ins[i].params[j];
-                    ins[i].params[j] = Token::make(*(replace[ri].second));
+                    ins[i].params[j] = new Token(*(replace[ri].second));
                     delete replace[ri].first;
                     delete replace[ri].second;
                     replace.erase(replace.begin()+ri);
@@ -1979,12 +1947,12 @@ bool Script::postprocessing(Compiled& code)
                 }
             }
 
-            switch(ins[i].op->getType())
+            switch(ins[i].op->t)
             {
                 case OPERATOR:
-                    if(ins[i].op->getString() == "=")
+                    if(ins[i].op->s == "=")
                     {
-                        int pzt = ins[i].params[0]->getType();
+                        int pzt = ins[i].params[0]->t;
                         if(!ins[i].hasResult && (pzt != VAR && pzt != RESULT && pzt != GVAR))
                         {
                             ins[i].clear();
@@ -1993,11 +1961,11 @@ bool Script::postprocessing(Compiled& code)
                         }
                         else if(ins[i].hasResult && (pzt == VAR || pzt == RESULT || pzt == GVAR))
                         {
-                            replace.push_back({ins[i].params[2], Token::make(*(ins[i].params[0]))});
+                            replace.push_back({ins[i].params[2], new Token(*(ins[i].params[0]))});
                             ins[i].params.pop_back();
                             ins[i].hasResult = false;
                         }
-                        if(!ins[i].hasResult && (pzt == VAR || pzt == RESULT || pzt == GVAR) && ins[i].params[1]->getType() == RESULT)
+                        if(!ins[i].hasResult && (pzt == VAR || pzt == RESULT || pzt == GVAR) && ins[i].params[1]->t == RESULT)
                         {
                             for(int j = i - 1; j >= 0; --j)
                             {
@@ -2015,11 +1983,11 @@ bool Script::postprocessing(Compiled& code)
                             }
                         }
                     }
-                    else if(ins[i].op->getString() == "-" && ins[i].op->getTag() == PREFIX)
+                    else if(ins[i].op->s == "-" && ins[i].op->o == PREFIX)
                     {
                         if(ins[i].hasResult)
                         {
-                            if(ins[i].params[0]->isDigit())
+                            if(ins[i].params[0]->isNumber())
                             {
                                 ins[i].params[0]->inverseSign();
                                 replace.push_back({ins[i].params[1], ins[i].params[0]});
@@ -2038,13 +2006,13 @@ bool Script::postprocessing(Compiled& code)
                     }
                     else // +=, -=, etc... NOT != and ==
                     {
-                        std::string tmp = ins[i].op->getString();
+                        std::string tmp = ins[i].op->s;
                         if(tmp.size() == 2 && tmp[1] == '=' && tmp[0] != '!' && tmp[0] != '=' && tmp[0] != '>' && tmp[0] != '<')
                         {
-                            int pzt = ins[i].params[0]->getType();
+                            int pzt = ins[i].params[0]->t;
                             if(ins[i].hasResult && (pzt == VAR || pzt == RESULT || pzt == GVAR))
                             {
-                                replace.push_back({ins[i].params[2], Token::make(*(ins[i].params[0]))});
+                                replace.push_back({ins[i].params[2], new Token(*(ins[i].params[0]))});
                                 ins[i].params.pop_back();
                                 ins[i].hasResult = false;
                             }
@@ -2064,11 +2032,11 @@ bool Script::postprocessing(Compiled& code)
         func.creg = 0;
         for(auto &xj: func.line)
         {
-            switch(xj.op->getType())
+            switch(xj.op->t)
             {
                 case OPERATOR:
                 {
-                    Token *tmp = Token::make(std::to_string(op_unordered_map.at(xj.op->getString())), COP);
+                    Token *tmp = new Token(std::to_string(op_unordered_map.at(xj.op->s)), COP);
                     delete xj.op;
                     xj.op = tmp;
                     break;
@@ -2078,20 +2046,20 @@ bool Script::postprocessing(Compiled& code)
             }
             for(auto &xk: xj.params)
             {
-                switch(xk->getType())
+                switch(xk->t)
                 {
                     case VAR:
                     {
                         size_t id = 0;
                         for(; id < func.var.size(); ++id)
                         {
-                            if(func.var[id] == xk->getString())
+                            if(func.var[id] == xk->s)
                                 break;
                         }
                         if(id != func.var.size())
                         {
                             delete xk;
-                            xk = Token::make(std::to_string(id), CVAR);
+                            xk = new Token(std::to_string(id), CVAR);
                         }
                         break;
                     }
@@ -2144,7 +2112,7 @@ bool Script::save(const std::string& output, const Compiled& code)
 
         for(auto &xj: func.line)
         {
-            tmp = xj.op->getType();
+            tmp = xj.op->t;
             o.write((char*)&tmp, 1);
             if(xj.op->isIntValue())
             {
@@ -2159,7 +2127,7 @@ bool Script::save(const std::string& output, const Compiled& code)
             else
             {
                 if(xj.op->isStringValue()) buf = xj.op->getStrippedString();
-                else buf = xj.op->getString();
+                else buf = xj.op->s;
                 tmp = buf.size();
                 o.write((char*)&tmp, 4);
                 if(tmp) o.write(buf.c_str(), tmp);
@@ -2171,7 +2139,7 @@ bool Script::save(const std::string& output, const Compiled& code)
 
             for(auto &xk: xj.params)
             {
-                tmp = xk->getType();
+                tmp = xk->t;
                 o.write((char*)&tmp, 1);
                 if(xk->isIntValue())
                 {
@@ -2186,7 +2154,7 @@ bool Script::save(const std::string& output, const Compiled& code)
                 else
                 {
                     if(xk->isStringValue()) buf = xk->getStrippedString();
-                    else buf = xk->getString();
+                    else buf = xk->s;
                     tmp = buf.size();
                     o.write((char*)&tmp, 4);
                     if(tmp) o.write(buf.c_str(), tmp);
@@ -2212,21 +2180,21 @@ void Script::print(Compiled& code)
         {
             std::cout << xl << " -> ";
             ++xl;
-            if(xj.op->getType() == RESULT) std::cout << "r" << xj.op->getInt() << " ";
-            else if(xj.op->getType() == GVAR) std::cout << "@" << xj.op->getInt() << " ";
-            else if(xj.op->getType() == CVAR) std::cout << "v" << xj.op->getInt() << " ";
+            if(xj.op->t == RESULT) std::cout << "r" << xj.op->getInt() << " ";
+            else if(xj.op->t == GVAR) std::cout << "@" << xj.op->getInt() << " ";
+            else if(xj.op->t == CVAR) std::cout << "v" << xj.op->getInt() << " ";
             else if(xj.op->isIntValue()) std::cout << xj.op->getInt() << " ";
             else if(xj.op->isFloatValue()) std::cout << xj.op->getFloat() << " ";
-            else std::cout << xj.op->getString() << " ";
+            else std::cout << xj.op->s << " ";
             std::cout << (xj.hasResult ? "[1] " : "[0] ");
             for(auto j: xj.params)
             {
-                if(j->getType() == RESULT) std::cout << "r" << j->getInt() << " ";
-                else if(j->getType() == GVAR) std::cout << "@" << j->getInt() << " ";
-                else if(j->getType() == CVAR) std::cout << "v" << j->getInt() << " ";
+                if(j->t == RESULT) std::cout << "r" << j->getInt() << " ";
+                else if(j->t == GVAR) std::cout << "@" << j->getInt() << " ";
+                else if(j->t == CVAR) std::cout << "v" << j->getInt() << " ";
                 else if(j->isIntValue()) std::cout << j->getInt() << " ";
                 else if(j->isFloatValue()) std::cout << j->getFloat() << " ";
-                else std::cout << j->getString() << " ";
+                else std::cout << j->s << " ";
             }
             std::cout << std::endl;
         }
@@ -2243,12 +2211,12 @@ void Script::debug(Program& code)
         {
             for(auto &k: j)
             {
-                if(k->getType() == RESULT) std::cout << "r" << k->getInt() << " ";
-                else if(k->getType() == RESULT) std::cout << "@" << k->getInt() << " ";
-                else if(k->getType() == CVAR) std::cout << "v" << k->getInt() << " ";
+                if(k->t == RESULT) std::cout << "r" << k->getInt() << " ";
+                else if(k->t == RESULT) std::cout << "@" << k->getInt() << " ";
+                else if(k->t == CVAR) std::cout << "v" << k->getInt() << " ";
                 else if(k->isIntValue()) std::cout << k->getInt() << " ";
                 else if(k->isFloatValue()) std::cout << k->getFloat() << " ";
-                else std::cout << k->getString() << " ";
+                else std::cout << k->s << " ";
             }
             std::cout << std::endl;
         }

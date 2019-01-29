@@ -19,26 +19,22 @@ enum {UNDEF, PREFIX, INFIX, POSTFIX};
 
 struct Token
 {
-    public:
-        static Token* make(const std::string& s, const int& t, const int& o = UNDEF);
-        static Token* make(Token &cpy);
-        bool isIntValue() const;
-        bool isFloatValue() const;
-        bool isStringValue() const;
-        bool isDigit() const;
-        std::string getString() const;
-        std::string getStrippedString() const;
-        void inverseSign();
-        int getInt() const;
-        float getFloat() const;
-        int getType() const;
-        int getTag() const;
-        bool operator==(const Token& rhs);
+    std::string s; // token content
+    int t = INVALID; // token type
+    int o = UNDEF; // token tag
 
-    private:
-        std::string s;
-        int t = INVALID;
-        int o = UNDEF;
+    Token();
+    Token(const std::string& s, const int& t, const int& o = UNDEF);
+    Token(Token &cpy);
+    bool isIntValue() const;
+    bool isFloatValue() const;
+    bool isStringValue() const;
+    bool isNumber() const;
+    std::string getStrippedString() const;
+    void inverseSign();
+    int getInt() const;
+    float getFloat() const;
+    bool operator==(const Token& rhs);
 };
 
 typedef std::vector<std::vector<Token*> > TokenList;
