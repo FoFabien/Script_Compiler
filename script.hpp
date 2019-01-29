@@ -23,19 +23,27 @@ struct Token
     int t = INVALID; // token type
     int o = UNDEF; // token tag
 
-    Token();
-    Token(const std::string& s, const int& t, const int& o = UNDEF);
-    Token(Token &cpy);
+    Token() {}
+    Token(const std::string& s, const int& t, const int& o = UNDEF): s(s), t(t), o(o) {}
+    Token(Token &cpy): s(cpy.s), t(cpy.t), o(cpy.o) {}
 
-    bool isIntValue() const; // isInt() != isNumber()
-    bool isFloatValue() const;
-    bool isStringValue() const;
-    bool isNumber() const;
-    std::string getStrippedString() const;
-    void inverseSign();
-    int getInt() const;
-    float getFloat() const;
-    bool operator==(const Token& rhs);
+    bool isIntValue() const { return (t == INT || t == RESULT || t == CVAR || t == COP || t == GVAR); }
+    bool isFloatValue() const { return (t == FLOAT); }
+    bool isStringValue() const { return (t == STR); }
+    bool isNumber() const { return (t == INT || t == FLOAT); }
+    std::string getStrippedString() const { return (s.size() < 2 ? "" : s.substr(1, s.size()-2)); }
+    void inverseSign()
+    {
+        switch(t)
+        {
+            case INT: s = std::to_string(-std::stoi(s)); break;
+            case FLOAT:s = std::to_string(-std::stof(s)); break;
+            default: break;
+        }
+    }
+    int getInt() const { return std::stoi(s); }
+    float getFloat() const { return std::stof(s); }
+    bool operator==(const Token& rhs) { return (t == rhs.t) && (s == rhs.s) && (o == rhs.o); }
 };
 
 typedef std::vector<std::vector<Token*> > TokenList;
@@ -79,8 +87,8 @@ class Value
         bool set(const int& v);
         bool set(const float& v);
         bool set(const std::string& v);
-        const int& getType() const;
-        const void* getP() const;
+        const int& getType() const { return t; }
+        const void* getP() const { return p; }
         template <class T> const T* get() const { return (T*)p;}
         bool operator==(const Value& rhs);
 

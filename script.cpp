@@ -24,17 +24,17 @@ static const std::unordered_map<std::string, int> op_list = {
 {"==", 1}, {"&", 5}, {"^", 5}, {"|", 5}, {"&&", 2}, {"||", 2}, {"^^", 2}, {"++", 6}, {"--", 6}, {"+=", 0}, {"-=", 0}, {"*=", 0}, {"/=", 0}
 };
 
-bool isFunction(const std::string &f, const Compiled &c)
+static bool isFunction(const std::string &f, const Compiled &c)
 {
     return (gl_func.find(f) != gl_func.end() || c.find(f) != c.end());
 }
 
-bool isCondition(const std::string &f)
+static bool isCondition(const std::string &f)
 {
     return (f == "if" || f == "else" || f == "elif" || f == "while");
 }
 
-bool isName(const std::string &name)
+static bool isName(const std::string &name)
 {
     if(isdigit(name[0])) return false;
     for(auto &c: name)
@@ -45,7 +45,7 @@ bool isName(const std::string &name)
     return true;
 }
 
-int detectType(const std::string &s)
+static int detectType(const std::string &s)
 {
     if(s.size() >= 2 && s[0] == '"' && s.back() == '"')
         return 0; // string
@@ -96,7 +96,7 @@ int detectType(const std::string &s)
     }
 }
 
-bool isSingleOp(const std::string &op)
+static bool isSingleOp(const std::string &op)
 {
     // checking: (op == "!" || op == "++" || op == "--");
 
@@ -116,14 +116,14 @@ bool isSingleOp(const std::string &op)
     }
 }
 
-bool isPrefixOp(const std::string &op)
+static bool isPrefixOp(const std::string &op)
 {
     //checking: (op == "-" || op == "!" || op == "++" || op == "--");
 
     return (isSingleOp(op) || op == "-");
 }
 
-bool isInfixOp(const std::string &op)
+static bool isInfixOp(const std::string &op)
 {
     /*checking: (op == "=" || op == "+" || op == "-" || op == "*" || op == "/" || op == "!=" || op == ">" || op == "<" || op == ">=" || op == "<=" || op == "!=" || op == "==" || op == "&" || op == "^"
             || op == "|" || op == "&&" || op == "||" || op == "^^" || op == "+=" || op == "-=" || op == "*=" || op == "/=" || op == "%" || op == "%=");
@@ -145,88 +145,19 @@ bool isInfixOp(const std::string &op)
     }
 }
 
-bool isPostfixOp(const std::string &op)
+static bool isPostfixOp(const std::string &op)
 {
     return (op == "++" || op == "--");
 }
 
-bool greater_precedence(const std::string &op1, const std::string &op2)
+static bool greater_precedence(const std::string &op1, const std::string &op2)
 {
     return op_list.at(op1) > op_list.at(op2);
 }
 
-bool equal_precedence(const std::string &op1, const std::string &op2)
+static bool equal_precedence(const std::string &op1, const std::string &op2)
 {
     return op_list.at(op1) == op_list.at(op2);
-}
-
-Token::Token()
-{
-
-}
-
-Token::Token(const std::string& s, const int& t, const int& o): s(s), t(t), o(o)
-{
-
-}
-
-Token::Token(Token &cpy)
-{
-    s = cpy.s;
-    t = cpy.t;
-    o = cpy.o;
-}
-
-bool Token::isIntValue() const
-{
-    return (t == INT || t == RESULT || t == CVAR || t == COP || t == GVAR);
-}
-
-bool Token::isFloatValue() const
-{
-    return (t == FLOAT);
-}
-
-bool Token::isStringValue() const
-{
-    return (t == STR);
-}
-
-bool Token::isNumber() const
-{
-    return (t == INT || t == FLOAT);
-}
-
-std::string Token::getStrippedString() const
-{
-    if(s.size() < 2) return "";
-    return s.substr(1, s.size()-2);
-}
-
-void Token::inverseSign()
-{
-    switch(t)
-    {
-        case INT: s = std::to_string(-std::stoi(s)); break;
-        case FLOAT:s = std::to_string(-std::stof(s)); break;
-        default:
-            break;
-    }
-}
-
-int Token::getInt() const
-{
-    return std::stoi(s);
-}
-
-float Token::getFloat() const
-{
-    return std::stof(s);
-}
-
-bool Token::operator==(const Token& rhs)
-{
-    return (t == rhs.t) && (s == rhs.s) && (o == rhs.o);
 }
 
 //***************************************************************************************************************
@@ -247,121 +178,63 @@ void Value::clear()
 {
     switch(t)
     {
-        case FUNC: case STR:
-            delete (std::string*)p;
-            break;
-        case INT: case COP: case RESULT: case CVAR: case CFUNC: case GVAR:
-            delete (int*)p;
-            break;
-        case FLOAT:
-            delete (float*)p;
-            break;
-        case GFUNC:
-            delete (CallRef*)p;
-            break;
+        case FUNC: case STR: delete (std::string*)p; break;
+        case INT: case COP: case RESULT: case CVAR: case CFUNC: case GVAR: delete (int*)p; break;
+        case FLOAT: delete (float*)p; break;
+        case GFUNC: delete (CallRef*)p; break;
         case LCUR: case RCUR: default: break;
     }
     t = TBD;
-    p = nullptr;
 }
 
 bool Value::set(const void *any, const int& type)
 {
-    if(type != t)
+    switch(type)
     {
-        clear();
-        switch(type)
-        {
-            case FUNC: case STR:
-                p = new std::string(((std::string*)any)->c_str());
-                break;
-            case INT: case COP: case RESULT: case CVAR: case CFUNC: case GVAR:
-                p = new int(*(const int*)any);
-                break;
-            case FLOAT:
-                p = new float(*(const float*)any);
-                break;
-            case GFUNC:
-                p = new CallRef(*(const CallRef*)any);
-                break;
-            case LCUR: case RCUR:
-                p = nullptr;
-                break;
-            default: return false;
-        }
-        t = type;
+        case STR: case FUNC:
+            if(t != type) { clear(); p = new std::string(*(const std::string*)any); }
+            else (*(std::string*)p) = (*(const std::string*)any);
+            break;
+        case INT: case COP: case RESULT: case CVAR: case CFUNC: case GVAR:
+            if(t != type) { clear(); p = new int(*(const int*)any); }
+            else (*(int*)p) = (*(const int*)any);
+            break;
+        case FLOAT:
+            if(t != type) { clear(); p = new float(*(const float*)any); }
+            else (*(float*)p) = (*(const float*)any);
+            break;
+        case GFUNC:
+            if(t != GFUNC) { clear(); p = new CallRef(*(const CallRef*)any); }
+            else (*(CallRef*)p) = (*(const CallRef*)any);
+            break;
+        case LCUR: case RCUR:
+            if(t != type) { clear(); p = nullptr; }
+            break;
+        default: return false;
     }
-    else
-    {
-        switch(type)
-        {
-            case FUNC: case STR:
-                (*(std::string*)p) = ((const std::string*)any)->c_str();
-                break;
-            case INT: case COP: case RESULT: case CVAR: case CFUNC: case GVAR:
-                (*(int*)p) = (*(const int*)any);
-                break;
-            case FLOAT:
-                (*(float*)p) = (*(const float*)any);
-                break;
-            case GFUNC:
-                (*(CallRef*)p) = (*(const CallRef*)any);
-                break;
-            case LCUR: case RCUR:
-                break;
-            default: return false;
-        }
-    }
+    t = type;
     return true;
 }
 
 bool Value::set(const int& v)
 {
-    if(t == INT)
-    {
-        *((int*)p) = v;
-        return true;
-    }
-    clear();
-    p = new int(v);
-    t = INT;
+    if(t == INT) *((int*)p) = v;
+    else { clear(); p = new int(v); t = INT; }
     return true;
 }
 
 bool Value::set(const float& v)
 {
-    if(t == FLOAT)
-    {
-        *((float*)p) = v;
-        return true;
-    }
-    clear();
-    p = new float(v);
-    t = FLOAT;
+    if(t == FLOAT) *((float*)p) = v;
+    else { clear(); p = new float(v); t = FLOAT; }
     return true;
 }
 
 bool Value::set(const std::string& v)
 {
-    if(t == STR)
-    {
-        *((std::string*)p) = v;
-        return true;
-    }
-    clear();
-    p = new std::string(v.c_str());
-    t = STR;
+    if(t == STR) *((std::string*)p) = v;
+    else { clear(); p = new std::string(v); t = STR; }
     return true;
-}
-
-const int& Value::getType() const
-{
-    return t;
-}
-
-const void* Value::getP() const
-{
-    return p;
 }
 
 bool Value::operator==(const Value& rhs)
