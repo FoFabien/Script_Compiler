@@ -160,16 +160,6 @@ bool equal_precedence(const std::string &op1, const std::string &op2)
     return op_list.at(op1) == op_list.at(op2);
 }
 
-Token::Token()
-{
-    t = INVALID;
-}
-
-Token::~Token()
-{
-
-}
-
 Token* Token::make(const std::string& s, const int& t, const int& o)
 {
     Token *tk = new Token();
@@ -177,16 +167,10 @@ Token* Token::make(const std::string& s, const int& t, const int& o)
     tk->o = o;
     switch(t)
     {
-        case INT: case RESULT: case CVAR: case COP: case GVAR:
-            tk->i = std::stod(s);
-            break;
-        case FLOAT:
-            tk->f = std::stof(s);
-            break;
-        case STR: case OPERATOR: case LBRK: case RBRK: case COMMA: case LCUR: case RCUR: case FUNC: case VAR: case TBD:
+        default:
             tk->s = s;
             break;
-        case INVALID: default:
+        case INVALID:
             return nullptr;
     }
     return tk;
@@ -196,8 +180,6 @@ Token* Token::make(Token &cpy)
 {
     Token *tk = new Token();
     tk->s = cpy.s;
-    tk->i = cpy.i;
-    tk->f = cpy.f;
     tk->t = cpy.t;
     tk->o = cpy.o;
     return tk;
@@ -236,18 +218,23 @@ std::string Token::getStrippedString() const
 
 void Token::inverseSign()
 {
-    i = -i;
-    f = -f;
+    switch(t)
+    {
+        case INT: s = std::to_string(-std::stoi(s)); break;
+        case FLOAT:s = std::to_string(-std::stof(s)); break;
+        default:
+            break;
+    }
 }
 
 int Token::getInt() const
 {
-    return i;
+    return std::stoi(s);
 }
 
 float Token::getFloat() const
 {
-    return f;
+    return std::stof(s);
 }
 
 int Token::getType() const
@@ -266,13 +253,9 @@ bool Token::operator==(const Token& rhs)
     if(o != rhs.o) return false;
     switch(t)
     {
-        case INT: case RESULT: case CVAR: case COP: case GVAR:
-            return (i == rhs.i);
-        case FLOAT:
-            return (f == rhs.f);
-        case STR: case OPERATOR: case LBRK: case RBRK: case COMMA: case LCUR: case RCUR: case FUNC: case VAR: case TBD:
-            return (s == rhs.s);
         default:
+            return (s == rhs.s);
+        case INVALID:
             return false;
     }
 }

@@ -17,11 +17,9 @@
 enum {INVALID, STR, INT, FLOAT, OPERATOR, LBRK, RBRK, COMMA, LCUR, RCUR, FUNC, VAR, RESULT, CVAR, COP, CFUNC, GFUNC, GVAR, TBD};
 enum {UNDEF, PREFIX, INFIX, POSTFIX};
 
-class Token
+struct Token
 {
     public:
-        Token();
-        ~Token();
         static Token* make(const std::string& s, const int& t, const int& o = UNDEF);
         static Token* make(Token &cpy);
         bool isIntValue() const;
@@ -39,10 +37,8 @@ class Token
 
     private:
         std::string s;
-        int i;
-        float f;
-        int t;
-        int o;
+        int t = INVALID;
+        int o = UNDEF;
 };
 
 typedef std::vector<std::vector<Token*> > TokenList;
@@ -113,7 +109,7 @@ struct Function
 typedef std::vector<Function> Runtime;
 
 class Script;
-typedef void (*Callback)(Script*, Line&) ;
+typedef void (*Callback)(Script*, Line&);
 typedef std::unordered_map<std::string, Callback>::iterator CallRef;
 
 struct IfPos
