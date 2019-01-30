@@ -555,8 +555,23 @@ void Script::setVar(const int& i, const Value& v, const int &type)
         case GVAR: p = &(globalVars[i]); break;
         default: setError("setVar(Value) error"); return;
     }
-    if(!p->set(v.getP(), v.getType()))
-        setError("set(Value) error");
+    switch(v.getType())
+    {
+        case GVAR: case CVAR: case RESULT:
+        {
+            int t;
+            const void* ptr = getValueContent(v, t);
+            if(!p->set(ptr,t))
+                setError("set(Value) error");
+            break;
+        }
+        case INT: case FLOAT: case STR:
+            if(!p->set(v.getP(), v.getType()))
+                setError("set(Value) error");
+            break;
+        default: setError("setVar(Value) error");
+    }
+
 }
 
 Value& Script::getVar(const Value& v)
