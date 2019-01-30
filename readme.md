@@ -48,7 +48,7 @@ def add(a, b)
 print("2+3=" + add(2,3));
 ```  
 
-###Bigger example:  
+##### Bigger example:  
 * [Snake game](https://github.com/FoFabien/Script_Compiler/tree/master/examples/snake): Using SFML for the graphical part. snake.cpp contains functions used by the script, the compilation call and the run part.  
   
 ### To do  
