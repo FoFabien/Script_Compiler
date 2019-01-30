@@ -27,11 +27,11 @@ Random notes:
 * No OOP support planned, I'm keeping it simple, for now.  
   
 ### Examples  
-Hello world:  
+* Hello world:  
 ```c
 print("Hello world");
 ```  
-Counting to ten:  
+* Counting to ten:  
 ```c
 c = 0;
 while(c < 10)
@@ -39,7 +39,7 @@ while(c < 10)
     print("Counting: " + (++c));
 }
 ```  
-Declaring a function:  
+* Declaring a function:  
 ```c
 def add(a, b)
 {
@@ -47,8 +47,7 @@ def add(a, b)
 }
 print("2+3=" + add(2,3));
 ```  
-
-##### Bigger example:  
+#### Bigger example:  
 * [Snake game](https://github.com/FoFabien/Script_Compiler/tree/master/examples/snake): Using SFML for the graphical part. snake.cpp contains functions used by the script, the compilation call and the run part.  
   
 ### To do  
