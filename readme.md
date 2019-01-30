@@ -1,19 +1,19 @@
 # Script Compiler  
   
-C++11 Class to compiler and run simple user scripts.  
+C++11 Class to compile and run simple user scripts.  
 Currently in a Beta state.  
   
 ### Compile Time  
 Four steps are taken:  
 * Loading the file and breaking down the text in tokens. I used a regex previously but it's way too slow (removing the regex reduced the compile time by 75%).  
 * Tokens are then passed to a shunting yard algorithm. It's the result of my previous [try in Python](https://github.com/FoFabien/Compiler-wip-) improved with more trial&error and discussions I read [online](https://stackoverflow.com/questions/16380234/handling-extra-operators-in-shunting-yard). The state machine is divided in 4 parts. GOTO allergics, turn back now.  
-* The output is now sorted in a [Reverse Polish Notation (RPN)](https://en.wikipedia.org/wiki/Reverse_Polish_notation) and broken down furtger into simpler instructions (one operator/function with optional parameters and an optional variable for the return value).  
+* The output is now sorted in a [Reverse Polish Notation (RPN)](https://en.wikipedia.org/wiki/Reverse_Polish_notation) and broken down further into simpler instructions (one operator/function with optional parameters and an optional variable for the return value).  
 * Finally, some error checks and optimizations.  
   
 ### Run Time  
 The script has a few different states: Stopped (default one), Paused, Running and Error.  
-It's a simple loop checking for the operator at the current line:  
-* "Global functions" trigger a callback to the hard-coded function (such as "if", "else", "print", "return").  
+It's a simple loop, checking for the operator at the current line:  
+* "Global functions" trigger a callback to the hard-coded function ("if", "else", "print", "return", etc... are such functions).  
 * Math operators trigger a call to Script::operation.  
 * "Local functions" cause the current state (variables, pc, etc...) to be put into a stack. New blank variables are created for the function call.  
   
