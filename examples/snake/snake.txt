@@ -1,0 +1,76 @@
+// @X are global variables (10 are defined in this example, so @10 or higher will cause an error)
+// <non function names> are local variables, they only exist in the current function (uninitialized variables will cause an error)
+
+print("### START ###"); // print to the console
+initWindow(20); // create the SFML window and set the framerate to 20
+@0 = getMapWidth(); // map width
+@1 = getMapHeight(); // map height
+@2 = @0 / 2; // snake pos x
+@3 = @1 / 2; // snake pos y
+@4 = 0; // snake direction
+@5 = 2; // snake length
+@6 = 0; // key up state
+@7 = 0; // key right state
+@8 = 0; // key down state
+@9 = 0; // key left state
+frame = 0; // frame counter
+gover = 0; // 1 = gameover state
+best = 2; // best length reached
+
+// main loop
+while(isWindowOpen()) // while the window is open
+{
+    pollEvent(); // poll SFML events (such as the close button)
+    if(checkKey(4)) { closeWindow(); } // close window if escape is pressed
+    elif(checkKey(5)) // reset the game if R is pressed
+    {
+        @2 = @0 / 2;
+        @3 = @1 / 2;
+        @4 = 3;
+        @5 = 2;
+        frame = 0;
+        gover = 0;
+        clearApples(); // clear the apple stack
+    }
+
+    if(!gover) // if we aren't in a game over state
+    {
+        // get directional key states
+        @6 = checkKey(0); // up
+        @7 = checkKey(1); // right
+        @8 = checkKey(2); // down
+        @9 = checkKey(3); // left
+
+        // update the direction according to the key states
+        if(@6 && (@4 != 2)) { @4 = 0; } elif(@7 && (@4 != 3)) { @4 = 1; }
+        elif(@8 && (@4 != 0)) { @4 = 2; } elif(@9 && (@4 != 1)) { @4 = 3; }
+
+        // update the position according to the direction
+        if(@4 == 0) { @3 = (@3 + @1 - 1) % @1; }
+        elif(@4 == 2) { @3 = (@3 + 1) % @1; }
+        elif(@4 == 3) { @2 = (@2 + @0 - 1) % @0; }
+        elif(@4 == 1) { @2 = (@2 + 1) % @0; }
+
+        pushSnakePos(@2, @3); // push the position into the queue
+        @5 += eatApple(); // grow if we ate an apple
+        updateSnakeLenght(@5); // check the length of the queue
+        gover = checkGameOver(); // check if we are in a game over state
+        if(gover) // if we are:
+        {
+            if(@5 > best) { best = @5; } // update best score
+            print("# GAME OVER #");
+            print("Score: " + (@5-2)*100);
+            print("Best : " + (best-2)*100);
+            print("Press R to reset, Escape to quit");
+        }
+    }
+    draw(); // clean the screen and draw
+
+    frame++; // increase frame counter
+    if(!gover && (frame % 40 == 0)) // spawn an apple every 40 frames
+    {
+        spawnApple(); // randomly spawn an apple
+    }
+}
+
+print("#### END ####");
