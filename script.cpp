@@ -24,12 +24,18 @@ static const std::unordered_map<std::string, int> op_list = {
 {"==", 1}, {"&", 5}, {"^", 5}, {"|", 5}, {"&&", 2}, {"||", 2}, {"^^", 2}, {"++", 6}, {"--", 6}, {"+=", 0}, {"-=", 0}, {"*=", 0}, {"/=", 0}
 };
 
-static bool isFunction(const std::string &f, const Compiled &c)
+typedef std::set<std::string> NameBank;
+inline static bool isNewFunction(const std::string &f, const NameBank &c)
 {
     return (gl_func.find(f) != gl_func.end() || c.find(f) != c.end());
 }
 
-static bool isCondition(const std::string &f)
+inline static bool isFunction(const std::string &f, const Compiled &c)
+{
+    return (gl_func.find(f) != gl_func.end() || c.find(f) != c.end());
+}
+
+inline static bool isCondition(const std::string &f)
 {
     return (f == "if" || f == "else" || f == "elif" || f == "while");
 }
@@ -45,14 +51,14 @@ static bool isName(const std::string &name)
     return true;
 }
 
-static int detectType(const std::string &s)
+static int detectType(const std::string &s) // I made my own thing instead of using regex or doing endless string comparisons
 {
     if(s.size() >= 2 && s[0] == '"' && s.back() == '"')
-        return 0; // string
+        return 0; // string value
 
     if(s.empty()) return -1;
 
-    if(isdigit(s[0]) || s[0] == '-')
+    if(isdigit(s[0]) || s[0] == '-') // number ?
     {
         char dot = 0;
         for(size_t i = 0; i < s.size(); ++i)
@@ -60,7 +66,7 @@ static int detectType(const std::string &s)
             switch(s[i])
             {
                 case '-':
-                    if(i == 0) dot = -1;
+                    if(i == 0 && s.size() > 1) dot = -1;
                     else return -1;
                     break;
                 case '.':
@@ -76,7 +82,7 @@ static int detectType(const std::string &s)
         }
         return (dot == 1 ? 2 : 1); // float : int
     }
-    else if(s[0] == '@')
+    else if(s[0] == '@') // global variable name ?
     {
         if(s.size() == 1) return -1;
         for(size_t i = 1; i < s.size(); ++i)
@@ -85,7 +91,7 @@ static int detectType(const std::string &s)
         }
         return 4; // gvar
     }
-    else
+    else // variable name ?
     {
         for(auto &c: s)
         {
@@ -105,57 +111,25 @@ static bool isSingleOp(const std::string &op)
         return false;
     switch(op[0])
     {
-        case '!':
-            if(i == 1) return true;
-            return false;
-        case '+': case '-':
-            if(i == 2 && op[1] == op[0]) return true;
-            return false;
-        default:
-            return false;
+        case '!': return (i == 1);
+        case '+': case '-': return (i == 2 && op[1] == op[0]);
+        default: return false;
     }
 }
 
-static bool isPrefixOp(const std::string &op)
+inline static bool isPrefixOp(const std::string &op)
 {
     //checking: (op == "-" || op == "!" || op == "++" || op == "--");
 
     return (isSingleOp(op) || op == "-");
 }
 
-static bool isInfixOp(const std::string &op)
-{
-    /*checking: (op == "=" || op == "+" || op == "-" || op == "*" || op == "/" || op == "!=" || op == ">" || op == "<" || op == ">=" || op == "<=" || op == "!=" || op == "==" || op == "&" || op == "^"
-            || op == "|" || op == "&&" || op == "||" || op == "^^" || op == "+=" || op == "-=" || op == "*=" || op == "/=" || op == "%" || op == "%=");
-    */
-
-    int i = op.size();
-    if(i < 1 || i > 2)
-        return false;
-    switch(op[0])
-    {
-        case '!':
-            return (i == 2 && op[1] == '=');
-        case '&': case '|': case '^':
-            return ((i == 2 && op[1] == op[0]) || i == 1);
-        case '=': case '+': case '-': case '*': case '/': case '%': case '<': case '>':
-            return ((i == 2 && op[1] == '=') || i == 1);
-        default:
-            return false;
-    }
-}
-
-static bool isPostfixOp(const std::string &op)
-{
-    return (op == "++" || op == "--");
-}
-
-static bool greater_precedence(const std::string &op1, const std::string &op2)
+inline static bool greater_precedence(const std::string &op1, const std::string &op2)
 {
     return op_list.at(op1) > op_list.at(op2);
 }
 
-static bool equal_precedence(const std::string &op1, const std::string &op2)
+inline static bool equal_precedence(const std::string &op1, const std::string &op2)
 {
     return op_list.at(op1) == op_list.at(op2);
 }
@@ -163,17 +137,6 @@ static bool equal_precedence(const std::string &op1, const std::string &op2)
 //***************************************************************************************************************
 // RUN
 //***************************************************************************************************************
-Value::Value()
-{
-    t = TBD;
-    p = nullptr;
-}
-
-Value::~Value()
-{
-
-}
-
 void Value::clear()
 {
     switch(t)
@@ -242,12 +205,14 @@ bool Value::operator==(const Value& rhs)
     if(t != rhs.t) return false;
     switch(t)
     {
-        case INT: case RESULT: case CVAR: case COP: case GVAR: case CFUNC: case GFUNC:
+        case INT: case RESULT: case CVAR: case COP: case GVAR: case CFUNC:
             return (*(int*)p == *(int*)rhs.p);
         case FLOAT:
             return (*(float*)p == *(float*)rhs.p);
         case STR: case OPERATOR: case LBRK: case RBRK: case COMMA: case LCUR: case RCUR: case FUNC: case VAR: case TBD:
             return (*(std::string*)p == *(std::string*)rhs.p);
+        case GFUNC:
+            return (*(CallRef*)p == *(CallRef*)rhs.p);
         default:
             return false;
     }
@@ -295,9 +260,6 @@ bool Script::load(const std::string& file)
     std::string buf;
     std::vector<std::string> lfunc;
 
-    // saving the result
-    // (file format subject to change)
-    // output file
     std::ifstream f(file, std::ios::in | std::ios::binary);
     if(!f)
         return false;
@@ -536,8 +498,7 @@ bool Script::run()
 void Script::setError(const std::string& err)
 {
     state = ERROR;
-    std::cout << "Error flag raised" << std::endl;
-    std::cout << "pc=" << pc << ", scope=" << scope << ", id=" << id << std::endl;
+    std::cout << "Error flag raised: id=" << id << ", pc=" << pc << ", scope=" << scope << std::endl;
     if(!err.empty())
         std::cout << "Message: " << err << std::endl;
 }
@@ -621,15 +582,16 @@ const void* Script::getValueContent(const Value& v, int &type)
             switch(w.getType())
             {
                 case INT: case FLOAT: case STR: p = w.getP(); type = w.getType(); break;
-                default: return nullptr;
+                default: type = TBD; break;
             }
             break;
         }
-        default: return nullptr;
+        default: type = TBD; break;
     }
     return p;
 }
 
+#warning "clean this mess"
 void Script::enterBlock(const bool& loop)
 {
     if(pc+1 >= (int)code[id].line.size() || code[id].line[pc+1].op.getType() != LCUR)
@@ -1179,11 +1141,17 @@ bool Script::compile(const std::string& file, const std::string& output, const c
     return !err;
 }
 
+static const std::unordered_map<std::string, int> have_operand_map = {
+{"++", 0}, {"--", 0}, {")", 1}, {",", 2}, {"=", 3}, {"+", 3}, {"-", 3}, {"*", 3}, {"/", 3}, {"!=", 3},
+{">", 3}, {"<", 3}, {"<=", 3}, {">=", 3}, {"!=", 3}, {"==", 3}, {"&", 3}, {"^", 3}, {"|", 3}, {"&&", 3},
+{"||", 3}, {"^^", 3}, {"+=", 3}, {"-=", 3}, {"*=", 3}, {"/=", 3}, {"%", 3}, {"%=", 3}, {"{", 4} , {";", 5}
+};
 bool Script::shuntingyard(const TokenIDList& tokens, Compiled& code)
 {
     // vars
     Program prog(20); // will contain the code in RPN
     VariableList vars(20); // variable names used by the code
+    NameBank bank; // storing all used names (to avoid dupes)
     bool ret; // return value
 
     std::stack<Token*> stack; // operator stack
@@ -1269,6 +1237,7 @@ want_operand:
                     output.push_back(new Token(*it, VAR));
                     if(vars[last_def].find(*it) == vars[last_def].end())
                         vars[last_def].insert(*it);
+                    bank.insert(*it);
                 }
                 else
                 {
@@ -1300,9 +1269,10 @@ want_operand:
 function_def: // definition of a new function
     {
         if(it == tokens.cend()) goto sy_error; // eof
-        if(!isName(*it) || isFunction(*it, code) || *it == "def") // check if the function name is valid
+        if(!isName(*it) || isNewFunction(*it, bank) || *it == "def") // check if the function name is valid
             goto sy_def_error;
         code[*it];
+        bank.insert(*it);
         auto &cdef = code[*it].argn; // register it with a parameter count of zero (for now)
         prog[*it]; // create the needed stuff
         auto &cvars = vars[*it] = std::set<std::string>();
@@ -1316,12 +1286,13 @@ function_def: // definition of a new function
         if(*it == ")") goto def_end; // if ), we are already done
 
         def_args:
-            if(isName(*it)) // expect a var name
+            if(isName(*it) && !isFunction(*it, code)) // expect a var name
             {
                 ++cdef;
                 if(cvars.find(*it) != cvars.end())
                     goto sy_def_error;
                 cvars.insert(*it); // register it (name must be unused in the function scope)
+                bank.insert(*it);
             }
             else goto sy_def_error; // else error
             if(++it == tokens.cend()) goto sy_error;
@@ -1353,107 +1324,114 @@ have_operand: // explicit
             stack.pop();
             output.push_back(tk);
         }
+        goto ended;
     }
-    else if(isPostfixOp(*it)) // ++, --, etc
     {
-        if(!output.empty())
+        auto mt = have_operand_map.find(*it);
+        if(mt == have_operand_map.end()) goto sy_error;
+        switch(mt->second)
         {
-            tk = output.back();
-            if(tk->t == VAR)
+            case 0: // postfix operators: ++, --, etc
             {
-                output.push_back(new Token(*it, OPERATOR, POSTFIX));
+                if(!output.empty())
+                {
+                    tk = output.back();
+                    if(tk->t == VAR)
+                    {
+                        output.push_back(new Token(*it, OPERATOR, POSTFIX));
+                        ++it;
+                        goto have_operand;
+                    }
+                }
+                stack.push(new Token(*it, OPERATOR, PREFIX));
+                ++it;
+                goto want_operand;
+            }
+            case 1: // closing bracket
+            {
+                if(stack.empty()) goto sy_empty_stack;
+                tk = stack.top();
+                while(tk->t != LBRK)
+                {
+                    output.push_back(tk);
+                    stack.pop();
+                    if(stack.empty()) goto sy_empty_stack;
+                    tk = stack.top();
+                }
+                delete tk;
+                stack.pop();
                 ++it;
                 goto have_operand;
             }
-        }
-        stack.push(new Token(*it, OPERATOR, PREFIX));
-        ++it;
-        goto want_operand;
-    }
-    else if(*it == ")") // closing bracket
-    {
-        if(stack.empty()) goto sy_empty_stack;
-        tk = stack.top();
-        while(tk->t != LBRK)
-        {
-            output.push_back(tk);
-            stack.pop();
-            if(stack.empty()) goto sy_empty_stack;
-            tk = stack.top();
-        }
-        delete tk;
-        stack.pop();
-        ++it;
-        goto have_operand;
-    }
-    else if(*it == ",") // comma (in function calls)
-    {
-        if(stack.empty()) goto sy_empty_stack;
-        tk = stack.top();
-        while(tk->t != LBRK)
-        {
-            output.push_back(tk);
-            stack.pop();
-            if(stack.empty()) goto sy_empty_stack;
-            tk = stack.top();
-        }
-        ++it;
-        goto want_operand;
-    }
-    else if(isInfixOp(*it)) // +, -, =, etc
-    {
-        if(!stack.empty())
-            tk = stack.top();
-        while(!stack.empty() && (tk->t == FUNC || (tk->t == OPERATOR && (greater_precedence(tk->s, *it) || (equal_precedence(tk->s, *it) && tk->o == PREFIX)) && *it != "^")) && tk->t != LBRK)
-        {
-            stack.pop();
-            output.push_back(tk);
-            if(!stack.empty())
-                tk = stack.top();
-        }
-        stack.push(new Token(*it, OPERATOR, INFIX));
-        ++it;
-        goto want_operand;
-    }
-    else if(*it == "{") // condition block
-    {
-        if(stack.empty()) goto sy_error;
-        tk = stack.top();
-        if(!isCondition(tk->s)) goto sy_error;
-        while(!stack.empty())
-        {
-            tk = stack.top();
-            stack.pop();
-            output.push_back(tk);
-        }
-        prog[last_def].push_back(output);
-        output.clear();
-
-        prog[last_def].push_back({new Token(*it, LCUR)});
-
-        ++scp;
-        ++it;
-        goto line_start;
-    }
-    else if(*it == ";") // end of "line"
-    {
-        ++it;
-        while(!stack.empty()) // we empty
-        {
-            tk = stack.top();
-            if(tk->t == LBRK)
+            case 2: // comma (in function calls)
             {
-                goto sy_error;
+                if(stack.empty()) goto sy_empty_stack;
+                tk = stack.top();
+                while(tk->t != LBRK)
+                {
+                    output.push_back(tk);
+                    stack.pop();
+                    if(stack.empty()) goto sy_empty_stack;
+                    tk = stack.top();
+                }
+                ++it;
+                goto want_operand;
             }
-            stack.pop();
-            output.push_back(tk);
-        }
-        prog[last_def].push_back(output); // and create a new line
-        output.clear();
-        goto line_start;
-    }
-    else goto sy_error;
+            case 3: // infix operators: +, -, =, etc
+            {
+                if(!stack.empty())
+                    tk = stack.top();
+                while(!stack.empty() && (tk->t == FUNC || (tk->t == OPERATOR && (greater_precedence(tk->s, *it) || (equal_precedence(tk->s, *it) && tk->o == PREFIX)) && *it != "^")) && tk->t != LBRK)
+                {
+                    stack.pop();
+                    output.push_back(tk);
+                    if(!stack.empty())
+                        tk = stack.top();
+                }
+                stack.push(new Token(*it, OPERATOR, INFIX));
+                ++it;
+                goto want_operand;
+            }
+            case 4: // condition block start {
+            {
+                if(stack.empty()) goto sy_error;
+                tk = stack.top();
+                if(!isCondition(tk->s)) goto sy_error;
+                while(!stack.empty())
+                {
+                    tk = stack.top();
+                    stack.pop();
+                    output.push_back(tk);
+                }
+                prog[last_def].push_back(output);
+                output.clear();
 
+                prog[last_def].push_back({new Token(*it, LCUR)});
+
+                ++scp;
+                ++it;
+                goto line_start;
+            }
+            case 5: // end of "line" ;
+            {
+                ++it;
+                while(!stack.empty()) // we empty
+                {
+                    tk = stack.top();
+                    if(tk->t == LBRK)
+                    {
+                        goto sy_error;
+                    }
+                    stack.pop();
+                    output.push_back(tk);
+                }
+                prog[last_def].push_back(output); // and create a new line
+                output.clear();
+                goto line_start;
+            }
+            default: goto sy_error;
+        }
+    }
 ended:
     //we are done
     //debug(prog);

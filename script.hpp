@@ -11,10 +11,11 @@
 #include <utility>
 #include <functional>
 
+// enum used at compile and run time
+enum {INVALID, STR, INT, FLOAT, OPERATOR, LBRK, RBRK, COMMA, LCUR, RCUR, FUNC, VAR, RESULT, CVAR, COP, CFUNC, GFUNC, GVAR, TBD};
 //***************************************************************************************************************
 // COMPILE
 //***************************************************************************************************************
-enum {INVALID, STR, INT, FLOAT, OPERATOR, LBRK, RBRK, COMMA, LCUR, RCUR, FUNC, VAR, RESULT, CVAR, COP, CFUNC, GFUNC, GVAR, TBD};
 enum {UNDEF, PREFIX, INFIX, POSTFIX};
 
 struct Token
@@ -80,9 +81,8 @@ typedef std::unordered_map<std::string, Code> Compiled;
 class Value
 {
     public:
-        Value();
-        ~Value();
-        void clear();
+        Value(): p(nullptr), t(TBD) {};
+        void clear(); // reminder: the memory must be FREE using clear
         bool set(const void *any, const int& type);
         bool set(const int& v);
         bool set(const float& v);
