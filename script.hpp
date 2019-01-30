@@ -146,17 +146,12 @@ class Script
         bool load(const std::string& file);
         bool run();
         void setError(const std::string& err = "");
-        void setVar(const int& i, const int& v, const int &type);
+        void setVar(const int& i, const int& v, const int &type); // set the variable content to v (i is the variable id, type is CVAR, GVAR, RESULT)
         void setVar(const int& i, const std::string& v, const int &type);
         void setVar(const int& i, const float& v, const int &type);
         void setVar(const int& i, const Value& v, const int &type);
-        Value& getVar(const Value& v);
-        Value& getVar(const int& i, const int &type);
-        const void* getValueContent(const Value& v, int &type);
-
-        void enterBlock(const bool& loop);
-        void skipBlock(const bool& checkElse);
-        void push_stack(Value* v);
+        Value& getVar(const Value& v); // get the variable content (setError() if it's not a variable)
+        const void* getValueContent(const Value& v, int &type); // get content and type stored in v. If v is a variable, return the variable content
 
         static bool compile(const std::string& file, const std::string& output, const char &flag = NONE);
 
@@ -189,12 +184,11 @@ class Script
         static void debug(Program& code);
 
         void operation(Line& line);
+        void enterBlock(const bool& loop);
+        void skipBlock(const bool& checkElse);
         int get_while_loop_point();
-
+        void push_stack(Line& line);
         void ret(const Value* v);
-        void ret(const int& v);
-        void ret(const float& v);
-        void ret(const std::string& v);
 
         // debug
         void printValue(const Value& v, const bool& isContent = false);

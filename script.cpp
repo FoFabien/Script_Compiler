@@ -424,37 +424,7 @@ bool Script::run()
                 break;
             case CFUNC:
             {
-                std::vector<const Value*> args;
-                size_t n = line.params.size() - (line.hasResult ? 1 : 0);
-                for(size_t i = 0; i < n; ++i)
-                {
-                    switch(line.params[i].getType())
-                    {
-                        case INT: case FLOAT: case STR: args.push_back(&line.params[i]); break;
-                        case RESULT: case CVAR: args.push_back(&getVar(*(line.params[i].get<int>()), line.params[i].getType())); break;
-                        default: setError("invalid parameter #" + std::to_string(i)); return false;
-                    }
-                }
-                if(line.hasResult)
-                {
-                    switch(line.params.back().getType())
-                    {
-                        case RESULT: case CVAR:
-                        {
-                            push_stack(&line.params.back());
-                            break;
-                        }
-                        default: setError("invalid result value"); return false;
-                    }
-                }
-                else push_stack(nullptr);
-                id = *(line.op.get<int>());
-                currentRegs.resize(code[id].regn);
-                currentVars.resize(code[id].varn);
-                for(size_t i = 0; i < code[id].argn; ++i)
-                {
-                    setVar(i, *args[i], CVAR);
-                }
+                push_stack(line);
                 break;
             }
             case LCUR:
@@ -576,12 +546,8 @@ void Script::setVar(const int& i, const Value& v, const int &type)
 
 Value& Script::getVar(const Value& v)
 {
-    return getVar(*v.get<int>(), v.getType());
-}
-
-Value& Script::getVar(const int& i, const int &type)
-{
-    switch(type)
+    const int& i = *v.get<int>();
+    switch(v.getType())
     {
         case RESULT: return currentRegs[i];
         case CVAR: return currentVars[i];
@@ -598,7 +564,7 @@ const void* Script::getValueContent(const Value& v, int &type)
         case INT: case FLOAT: case STR: p = v.getP(); type = v.getType(); break;
         case CVAR: case RESULT: case GVAR:
         {
-            Value& w = getVar(*v.get<int>(), v.getType());
+            Value& w = getVar(v);
             switch(w.getType())
             {
                 case INT: case FLOAT: case STR: p = w.getP(); type = w.getType(); break;
@@ -658,19 +624,62 @@ void Script::skipBlock(const bool& checkElse)
     canElse = checkElse;
 }
 
-void Script::push_stack(Value* v)
+void Script::push_stack(Line& line)
 {
-    if(v) return_stack.push(&getVar(*v->get<int>(), v->getType()));
+    // push the return stack (nullptr if no value expected in return)
+    if(line.hasResult)
+    {
+        switch(line.params.back().getType())
+        {
+            case RESULT: case CVAR:
+            {
+                return_stack.push(&getVar(line.params.back()));
+                break;
+            }
+            default: setError("invalid result value"); return;
+        }
+    }
     else return_stack.push(nullptr);
+
+    // save the current state
     call_stack.push(RunState());
     RunState &tmp = call_stack.top();
-    tmp.pc = pc;
-    tmp.id = id;
-    tmp.scope = scope;
-    tmp.ifstack.swap(ifstack);
-    tmp.vars.swap(currentVars);
+    tmp.pc = pc; // position
+    tmp.id = id; // function id
+    tmp.scope = scope; // scope
+    tmp.ifstack.swap(ifstack); // if stack
+    tmp.vars.swap(currentVars); // variables
     tmp.regs.swap(currentRegs);
-    pc = -1;
+
+    pc = -1; // function start
+    id = *(line.op.get<int>()); // new function id
+    if((line.params.size() - (line.hasResult ? 1 : 0)) != code[id].argn) // check parameter count
+    {
+        #warning "might not be needed"
+        setError("push_stack(): bad number of parameters");
+        return;
+    }
+    currentRegs.resize(code[id].regn); // set the new variables and registers
+    currentVars.resize(code[id].varn);
+    for(size_t i = 0; i < code[id].argn; ++i) // set their value according to the parameters
+    {
+        switch(line.params[i].getType())
+        {
+            case INT: case FLOAT: case STR: setVar(i, line.params[i], CVAR); break;
+            case RESULT: case CVAR:
+            {
+                tmp.vars.swap(currentVars); // swap to old variables, to retrieve the content
+                tmp.regs.swap(currentRegs);
+                Value& v = getVar(line.params[i]);
+                tmp.vars.swap(currentVars); // swap back to new variables
+                tmp.regs.swap(currentRegs);
+                setVar(i, v, CVAR);
+                break;
+            }
+            case GVAR: setVar(i, getVar(line.params[i]), CVAR); break;
+            default: setError("invalid parameter #" + std::to_string(i)); return;
+        }
+    }
 }
 
 void Script::ret(const Value* v)
@@ -695,102 +704,7 @@ void Script::ret(const Value* v)
                 setError("set(Value) error in ret(Value)");
         }
     }
-    if(!call_stack.empty())
-    {
-        RunState& f = call_stack.top();
-        pc = f.pc;
-        id = f.id;
-        scope = f.scope;
-        ifstack = f.ifstack;
-        for(auto &i: currentVars) i.clear();
-        for(auto &i: currentRegs) i.clear();
-        currentVars.swap(f.vars);
-        currentRegs.swap(f.regs);
-        call_stack.pop();
-    }
-}
-
-void Script::ret(const int& v)
-{
-    if(return_stack.empty())
-    {
-        if(id != entrypoint) setError("return stack is empty");
-        else state = STOP;
-    }
-    else
-    {
-        Value* p = return_stack.top();
-        return_stack.pop();
-        if(p)
-        {
-            if(!p->set(v))
-                setError("set(int) error in ret(int)");
-        }
-    }
-    if(!call_stack.empty())
-    {
-        RunState& f = call_stack.top();
-        pc = f.pc;
-        id = f.id;
-        scope = f.scope;
-        ifstack = f.ifstack;
-        for(auto &i: currentVars) i.clear();
-        for(auto &i: currentRegs) i.clear();
-        currentVars.swap(f.vars);
-        currentRegs.swap(f.regs);
-        call_stack.pop();
-    }
-}
-
-void Script::ret(const float& v)
-{
-    if(return_stack.empty())
-    {
-        if(id != entrypoint) setError("return stack is empty");
-        else state = STOP;
-    }
-    else
-    {
-        Value* p = return_stack.top();
-        return_stack.pop();
-        if(p)
-        {
-            if(!p->set(v))
-                setError("set(float) error in ret(float)");
-        }
-    }
-    if(!call_stack.empty())
-    {
-        RunState& f = call_stack.top();
-        pc = f.pc;
-        id = f.id;
-        scope = f.scope;
-        ifstack = f.ifstack;
-        for(auto &i: currentVars) i.clear();
-        for(auto &i: currentRegs) i.clear();
-        currentVars.swap(f.vars);
-        currentRegs.swap(f.regs);
-        call_stack.pop();
-    }
-}
-
-void Script::ret(const std::string& v)
-{
-    if(return_stack.empty())
-    {
-        if(id != entrypoint) setError("return stack is empty");
-        else state = STOP;
-    }
-    else
-    {
-        Value* p = return_stack.top();
-        return_stack.pop();
-        if(p)
-        {
-            if(!p->set(v))
-                setError("set(string) error in ret(string)");
-        }
-    }
+    // pull from the stack
     if(!call_stack.empty())
     {
         RunState& f = call_stack.top();
@@ -1234,7 +1148,6 @@ want_operand:
     }
     else if(*it == ")") // closing bracket, no arg function
     {
-        #warning ":("
         if(stack.empty()) goto sy_empty_stack;
         tk = stack.top();
         if(tk->t != LBRK) goto sy_error;
@@ -2808,7 +2721,6 @@ int Script::get_while_loop_point()
                     }
                 }
             }
-
             if(found)
             {
                 size_t n = l.params.size() - (l.hasResult ? 1 : 0);
@@ -2863,7 +2775,7 @@ void Script::printValue(const Value& v, const bool& isContent)
             else
             {
                 std::cout << (v.getType() == RESULT ? "register [" : "variable [") << (v.getType() == GVAR ? "G" : "") << *v.get<int>() << "] -> ";
-                if(loaded) printValue(getVar(*v.get<int>(), v.getType()), true);
+                if(loaded) printValue(getVar(v), true);
                 else std::cout << "???" << std::endl;
             }
             break;
