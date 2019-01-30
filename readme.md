@@ -27,7 +27,6 @@ Random notes:
 * No OOP support planned, I'm keeping it simple, for now.  
   
 ### Examples  
-(Bigger examples will be added at a later date)  
 Hello world:  
 ```c
 print("Hello world");
@@ -48,6 +47,9 @@ def add(a, b)
 }
 print("2+3=" + add(2,3));
 ```  
+
+###Bigger example:  
+* [Snake game](https://github.com/FoFabien/Script_Compiler/tree/master/examples/snake): Using SFML for the graphical part. snake.cpp contains functions used by the script, the compilation call and the run part.  
   
 ### To do  
 * More and more optimizations (especially for the run part). Compilation speed is satisfying, for now. As a result, big changes to the code could still happen.  
