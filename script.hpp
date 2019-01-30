@@ -150,6 +150,7 @@ class Script
         void setVar(const int& i, const std::string& v, const int &type);
         void setVar(const int& i, const float& v, const int &type);
         void setVar(const int& i, const Value& v, const int &type);
+        Value& getVar(const Value& v);
         Value& getVar(const int& i, const int &type);
         const void* getValueContent(const Value& v, int &type);
 

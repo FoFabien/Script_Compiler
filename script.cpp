@@ -559,6 +559,11 @@ void Script::setVar(const int& i, const Value& v, const int &type)
         setError("set(Value) error");
 }
 
+Value& Script::getVar(const Value& v)
+{
+    return getVar(*v.get<int>(), v.getType());
+}
+
 Value& Script::getVar(const int& i, const int &type)
 {
     switch(type)
@@ -2175,6 +2180,7 @@ void Script::operation(Line& line)
                         case INT: setVar(*target, *(const int*)u[0] + *(const int*)u[1], ttype); break;
                         case FLOAT: setVar(*target, *(const int*)u[0] + *(const float*)u[1], ttype); break;
                         case STR: setVar(*target, std::to_string(*(const int*)u[0]) + *(const std::string*)u[1], ttype); break;
+                        default: goto op_ins_error;
                     }
                     break;
                 case FLOAT:
@@ -2183,6 +2189,7 @@ void Script::operation(Line& line)
                         case INT: setVar(*target, *(const float*)u[0] + *(const int*)u[1], ttype); break;
                         case FLOAT: setVar(*target, *(const float*)u[0] + *(const float*)u[1], ttype); break;
                         case STR: setVar(*target, std::to_string(*(const float*)u[0]) + *(const std::string*)u[1], ttype); break;
+                        default: goto op_ins_error;
                     }
                     break;
                 case STR:
@@ -2191,8 +2198,10 @@ void Script::operation(Line& line)
                         case INT: setVar(*target, *(const std::string*)u[0] + std::to_string(*(const int*)u[1]), ttype); break;
                         case FLOAT: setVar(*target, *(const std::string*)u[0] + std::to_string(*(const float*)u[1]), ttype); break;
                         case STR: setVar(*target, *(const std::string*)u[0] + *(const std::string*)u[1], ttype); break;
+                        default: goto op_ins_error;
                     }
                     break;
+                default: goto op_ins_error;
             }
             break;
         case 2: case 21: // - +=
@@ -2216,6 +2225,7 @@ void Script::operation(Line& line)
                             case INT: setVar(*target, *(const int*)u[0] - *(const int*)u[1], ttype); break;
                             case FLOAT: setVar(*target, *(const int*)u[0] - *(const float*)u[1], ttype); break;
                             case STR: goto op_ins_error;
+                            default: goto op_ins_error;
                         }
                         break;
                     case FLOAT:
@@ -2224,9 +2234,11 @@ void Script::operation(Line& line)
                             case INT: setVar(*target, *(const float*)u[0] - *(const int*)u[1], ttype); break;
                             case FLOAT: setVar(*target, *(const float*)u[0] - *(const float*)u[1], ttype); break;
                             case STR: goto op_ins_error;
+                            default: goto op_ins_error;
                         }
                         break;
                     case STR:  goto op_ins_error;
+                    default: goto op_ins_error;
                 }
             }
             break;
@@ -2239,6 +2251,7 @@ void Script::operation(Line& line)
                         case INT: setVar(*target, *(const int*)u[0] * *(const int*)u[1], ttype); break;
                         case FLOAT: setVar(*target, *(const int*)u[0] * *(const float*)u[1], ttype); break;
                         case STR: goto op_ins_error;
+                        default: goto op_ins_error;
                     }
                     break;
                 case FLOAT:
@@ -2247,9 +2260,11 @@ void Script::operation(Line& line)
                         case INT: setVar(*target, *(const float*)u[0] * *(const int*)u[1], ttype); break;
                         case FLOAT: setVar(*target, *(const float*)u[0] * *(const float*)u[1], ttype); break;
                         case STR: goto op_ins_error;
+                        default: goto op_ins_error;
                     }
                     break;
                 case STR:  goto op_ins_error;
+                default: goto op_ins_error;
             }
             break;
         case 4: case 23: // / /=
@@ -2261,6 +2276,7 @@ void Script::operation(Line& line)
                         case INT: if(*(const int*)u[1] == 0) goto op_div_error; setVar(*target, *(const int*)u[0] / *(const int*)u[1], ttype); break;
                         case FLOAT: if(*(const float*)u[1] == 0.f) goto op_div_error; setVar(*target, *(const int*)u[0] / *(const float*)u[1], ttype); break;
                         case STR: goto op_ins_error;
+                        default: goto op_ins_error;
                     }
                     break;
                 case FLOAT:
@@ -2269,9 +2285,11 @@ void Script::operation(Line& line)
                         case INT: if(*(const int*)u[1] == 0) goto op_div_error; setVar(*target, *(const float*)u[0] / *(const int*)u[1], ttype); break;
                         case FLOAT: if(*(const float*)u[1] == 0.f) goto op_div_error; setVar(*target, *(const float*)u[0] / *(const float*)u[1], ttype); break;
                         case STR: goto op_ins_error;
+                        default: goto op_ins_error;
                     }
                     break;
                 case STR:  goto op_ins_error;
+                default: goto op_ins_error;
             }
             break;
         case 24: case 25: // % %=
@@ -2283,10 +2301,12 @@ void Script::operation(Line& line)
                         case INT: if(*(const int*)u[1] == 0) goto op_div_error; setVar(*target, *(const int*)u[0] % *(const int*)u[1], ttype); break;
                         case FLOAT: goto op_ins_error;
                         case STR: goto op_ins_error;
+                        default: goto op_ins_error;
                     }
                     break;
                 case FLOAT: goto op_ins_error;
                 case STR:  goto op_ins_error;
+                default: goto op_ins_error;
             }
             break;
         case 5: // !
@@ -2307,6 +2327,7 @@ void Script::operation(Line& line)
                         case INT: setVar(*target, *(const int*)u[0] != *(const int*)u[1], ttype); break;
                         case FLOAT: setVar(*target, *(const int*)u[0] != *(const float*)u[1], ttype); break;
                         case STR: setVar(*target, 0, ttype); break;
+                        default: goto op_ins_error;
                     }
                     break;
                 case FLOAT:
@@ -2315,6 +2336,7 @@ void Script::operation(Line& line)
                         case INT: setVar(*target, *(const float*)u[0] != *(const int*)u[1], ttype); break;
                         case FLOAT: setVar(*target, *(const float*)u[0] != *(const float*)u[1], ttype); break;
                         case STR: setVar(*target, 0, ttype); break;
+                        default: goto op_ins_error;
                     }
                     break;
                 case STR:
@@ -2323,8 +2345,10 @@ void Script::operation(Line& line)
                         case INT: setVar(*target, 0, ttype); break;
                         case FLOAT: setVar(*target, 0, ttype); break;
                         case STR: setVar(*target, *(const std::string*)u[0] != *(const std::string*)u[1], ttype); break;
+                        default: goto op_ins_error;
                     }
                     break;
+                default: goto op_ins_error;
             }
             break;
         case 7: // >
@@ -2336,6 +2360,7 @@ void Script::operation(Line& line)
                         case INT: setVar(*target, *(const int*)u[0] > *(const int*)u[1], ttype); break;
                         case FLOAT: setVar(*target, *(const int*)u[0] > *(const float*)u[1], ttype); break;
                         case STR: setVar(*target, 0, ttype); break;
+                        default: goto op_ins_error;
                     }
                     break;
                 case FLOAT:
@@ -2344,6 +2369,7 @@ void Script::operation(Line& line)
                         case INT: setVar(*target, *(const float*)u[0] > *(const int*)u[1], ttype); break;
                         case FLOAT: setVar(*target, *(const float*)u[0] > *(const float*)u[1], ttype); break;
                         case STR: setVar(*target, 0, ttype); break;
+                        default: goto op_ins_error;
                     }
                     break;
                 case STR:
@@ -2352,8 +2378,10 @@ void Script::operation(Line& line)
                         case INT: setVar(*target, 0, ttype); break;
                         case FLOAT: setVar(*target, 0, ttype); break;
                         case STR: setVar(*target, *(const std::string*)u[0] > *(const std::string*)u[1], ttype); break;
+                        default: goto op_ins_error;
                     }
                     break;
+                default: goto op_ins_error;
             }
             break;
         case 8: // <
@@ -2365,6 +2393,7 @@ void Script::operation(Line& line)
                         case INT: setVar(*target, *(const int*)u[0] < *(const int*)u[1], ttype); break;
                         case FLOAT: setVar(*target, *(const int*)u[0] < *(const float*)u[1], ttype); break;
                         case STR: setVar(*target, 0, ttype); break;
+                        default: goto op_ins_error;
                     }
                     break;
                 case FLOAT:
@@ -2373,6 +2402,7 @@ void Script::operation(Line& line)
                         case INT: setVar(*target, *(const float*)u[0] < *(const int*)u[1], ttype); break;
                         case FLOAT: setVar(*target, *(const float*)u[0] < *(const float*)u[1], ttype); break;
                         case STR: setVar(*target, 0, ttype); break;
+                        default: goto op_ins_error;
                     }
                     break;
                 case STR:
@@ -2381,8 +2411,10 @@ void Script::operation(Line& line)
                         case INT: setVar(*target, 0, ttype); break;
                         case FLOAT: setVar(*target, 0, ttype); break;
                         case STR: setVar(*target, *(const std::string*)u[0] < *(const std::string*)u[1], ttype); break;
+                        default: goto op_ins_error;
                     }
                     break;
+                default: goto op_ins_error;
             }
             break;
         case 9: // >=
@@ -2394,6 +2426,7 @@ void Script::operation(Line& line)
                         case INT: setVar(*target, *(const int*)u[0] >= *(const int*)u[1], ttype); break;
                         case FLOAT: setVar(*target, *(const int*)u[0] >= *(const float*)u[1], ttype); break;
                         case STR: setVar(*target, 0, ttype); break;
+                        default: goto op_ins_error;
                     }
                     break;
                 case FLOAT:
@@ -2402,6 +2435,7 @@ void Script::operation(Line& line)
                         case INT: setVar(*target, *(const float*)u[0] >= *(const int*)u[1], ttype); break;
                         case FLOAT: setVar(*target, *(const float*)u[0] >= *(const float*)u[1], ttype); break;
                         case STR: setVar(*target, 0, ttype); break;
+                        default: goto op_ins_error;
                     }
                     break;
                 case STR:
@@ -2410,8 +2444,10 @@ void Script::operation(Line& line)
                         case INT: setVar(*target, 0, ttype); break;
                         case FLOAT: setVar(*target, 0, ttype); break;
                         case STR: setVar(*target, *(const std::string*)u[0] >= *(const std::string*)u[1], ttype); break;
+                        default: goto op_ins_error;
                     }
                     break;
+                default: goto op_ins_error;
             }
             break;
         case 10: // <=
@@ -2423,6 +2459,7 @@ void Script::operation(Line& line)
                         case INT: setVar(*target, *(const int*)u[0] <= *(const int*)u[1], ttype); break;
                         case FLOAT: setVar(*target, *(const int*)u[0] <= *(const float*)u[1], ttype); break;
                         case STR: setVar(*target, 0, ttype); break;
+                        default: goto op_ins_error;
                     }
                     break;
                 case FLOAT:
@@ -2431,6 +2468,7 @@ void Script::operation(Line& line)
                         case INT: setVar(*target, *(const float*)u[0] <= *(const int*)u[1], ttype); break;
                         case FLOAT: setVar(*target, *(const float*)u[0] <= *(const float*)u[1], ttype); break;
                         case STR: setVar(*target, 0, ttype); break;
+                        default: goto op_ins_error;
                     }
                     break;
                 case STR:
@@ -2439,8 +2477,10 @@ void Script::operation(Line& line)
                         case INT: setVar(*target, 0, ttype); break;
                         case FLOAT: setVar(*target, 0, ttype); break;
                         case STR: setVar(*target, *(const std::string*)u[0] <= *(const std::string*)u[1], ttype); break;
+                        default: goto op_ins_error;
                     }
                     break;
+                default: goto op_ins_error;
             }
             break;
         case 11: // ==
@@ -2452,6 +2492,7 @@ void Script::operation(Line& line)
                         case INT: setVar(*target, *(const int*)u[0] == *(const int*)u[1], ttype); break;
                         case FLOAT: setVar(*target, *(const int*)u[0] == *(const float*)u[1], ttype); break;
                         case STR: setVar(*target, 0, ttype); break;
+                        default: goto op_ins_error;
                     }
                     break;
                 case FLOAT:
@@ -2460,6 +2501,7 @@ void Script::operation(Line& line)
                         case INT: setVar(*target, *(const float*)u[0] == *(const int*)u[1], ttype); break;
                         case FLOAT: setVar(*target, *(const float*)u[0] == *(const float*)u[1], ttype); break;
                         case STR: setVar(*target, 0, ttype); break;
+                        default: goto op_ins_error;
                     }
                     break;
                 case STR:
@@ -2468,8 +2510,10 @@ void Script::operation(Line& line)
                         case INT: setVar(*target, 0, ttype); break;
                         case FLOAT: setVar(*target, 0, ttype); break;
                         case STR: setVar(*target, *(const std::string*)u[0] == *(const std::string*)u[1], ttype); break;
+                        default: goto op_ins_error;
                     }
                     break;
+                default: goto op_ins_error;
             }
             break;
         case 12: // &
@@ -2481,10 +2525,12 @@ void Script::operation(Line& line)
                         case INT: setVar(*target, *(const int*)u[0] & *(const int*)u[1], ttype); break;
                         case FLOAT: goto op_ins_error;
                         case STR: goto op_ins_error;
+                        default: goto op_ins_error;
                     }
                     break;
                 case FLOAT:  goto op_ins_error;
                 case STR: goto op_ins_error;
+                default: goto op_ins_error;
             }
             break;
         case 13: // ^
@@ -2496,10 +2542,12 @@ void Script::operation(Line& line)
                         case INT: setVar(*target, *(const int*)u[0] ^ *(const int*)u[1], ttype); break;
                         case FLOAT: goto op_ins_error;
                         case STR: goto op_ins_error;
+                        default: goto op_ins_error;
                     }
                     break;
                 case FLOAT:  goto op_ins_error;
                 case STR: goto op_ins_error;
+                default: goto op_ins_error;
             }
             break;
         case 14: // |
@@ -2511,10 +2559,12 @@ void Script::operation(Line& line)
                         case INT: setVar(*target, *(const int*)u[0] | *(const int*)u[1], ttype); break;
                         case FLOAT: goto op_ins_error;
                         case STR: goto op_ins_error;
+                        default: goto op_ins_error;
                     }
                     break;
                 case FLOAT:  goto op_ins_error;
                 case STR: goto op_ins_error;
+                default: goto op_ins_error;
             }
             break;
         case 15: // &&
@@ -2526,6 +2576,7 @@ void Script::operation(Line& line)
                         case INT: setVar(*target, (*(const int*)u[0] != 0) && (*(const int*)u[1] != 0), ttype); break;
                         case FLOAT: setVar(*target, (*(const int*)u[0] != 0) && (*(const float*)u[1] != 0.f), ttype); break;
                         case STR: setVar(*target, (*(const int*)u[0] != 0) && (!((const std::string*)u[1])->empty()), ttype); break;
+                        default: goto op_ins_error;
                     }
                     break;
                 case FLOAT:
@@ -2534,6 +2585,7 @@ void Script::operation(Line& line)
                         case INT: setVar(*target, (*(const float*)u[0] != 0) && (*(const int*)u[1] != 0), ttype); break;
                         case FLOAT: setVar(*target, (*(const float*)u[0] != 0) && (*(const float*)u[1] != 0.f), ttype); break;
                         case STR: setVar(*target, (*(const float*)u[0] != 0) && (!((const std::string*)u[1])->empty()), ttype); break;
+                        default: goto op_ins_error;
                     }
                     break;
                 case STR:
@@ -2542,8 +2594,10 @@ void Script::operation(Line& line)
                         case INT: setVar(*target, (!((const std::string*)u[0])->empty()) && (*(const int*)u[1] != 0), ttype); break;
                         case FLOAT: setVar(*target, (!((const std::string*)u[0])->empty()) && (*(const float*)u[1] != 0.f), ttype); break;
                         case STR: setVar(*target, (!((const std::string*)u[0])->empty()) && (!((const std::string*)u[1])->empty()), ttype); break;
+                        default: goto op_ins_error;
                     }
                     break;
+                default: goto op_ins_error;
             }
             break;
         case 16: // ^^
@@ -2555,6 +2609,7 @@ void Script::operation(Line& line)
                         case INT: setVar(*target, (*(const int*)u[0] != 0) != (*(const int*)u[1] != 0), ttype); break;
                         case FLOAT: setVar(*target, (*(const int*)u[0] != 0) != (*(const float*)u[1] != 0.f), ttype); break;
                         case STR: setVar(*target, (*(const int*)u[0] != 0) != (!((const std::string*)u[1])->empty()), ttype); break;
+                        default: goto op_ins_error;
                     }
                     break;
                 case FLOAT:
@@ -2563,6 +2618,7 @@ void Script::operation(Line& line)
                         case INT: setVar(*target, (*(const float*)u[0] != 0) != (*(const int*)u[1] != 0), ttype); break;
                         case FLOAT: setVar(*target, (*(const float*)u[0] != 0) != (*(const float*)u[1] != 0.f), ttype); break;
                         case STR: setVar(*target, (*(const float*)u[0] != 0) != (!((const std::string*)u[1])->empty()), ttype); break;
+                        default: goto op_ins_error;
                     }
                     break;
                 case STR:
@@ -2571,8 +2627,10 @@ void Script::operation(Line& line)
                         case INT: setVar(*target, (!((const std::string*)u[0])->empty()) != (*(const int*)u[1] != 0), ttype); break;
                         case FLOAT: setVar(*target, (!((const std::string*)u[0])->empty()) != (*(const float*)u[1] != 0.f), ttype); break;
                         case STR: setVar(*target, (!((const std::string*)u[0])->empty()) != (!((const std::string*)u[1])->empty()), ttype); break;
+                        default: goto op_ins_error;
                     }
                     break;
+                default: goto op_ins_error;
             }
             break;
         case 17: // ||
@@ -2584,6 +2642,7 @@ void Script::operation(Line& line)
                         case INT: setVar(*target, (*(const int*)u[0] != 0) || (*(const int*)u[1] != 0), ttype); break;
                         case FLOAT: setVar(*target, (*(const int*)u[0] != 0) || (*(const float*)u[1] != 0.f), ttype); break;
                         case STR: setVar(*target, (*(const int*)u[0] != 0) || (!((const std::string*)u[1])->empty()), ttype); break;
+                        default: goto op_ins_error;
                     }
                     break;
                 case FLOAT:
@@ -2592,6 +2651,7 @@ void Script::operation(Line& line)
                         case INT: setVar(*target, (*(const float*)u[0] != 0) || (*(const int*)u[1] != 0), ttype); break;
                         case FLOAT: setVar(*target, (*(const float*)u[0] != 0) || (*(const float*)u[1] != 0.f), ttype); break;
                         case STR: setVar(*target, (*(const float*)u[0] != 0) || (!((const std::string*)u[1])->empty()), ttype); break;
+                        default: goto op_ins_error;
                     }
                     break;
                 case STR:
@@ -2600,8 +2660,10 @@ void Script::operation(Line& line)
                         case INT: setVar(*target, (!((const std::string*)u[0])->empty()) || (*(const int*)u[1] != 0), ttype); break;
                         case FLOAT: setVar(*target, (!((const std::string*)u[0])->empty()) || (*(const float*)u[1] != 0.f), ttype); break;
                         case STR: setVar(*target, (!((const std::string*)u[0])->empty()) || (!((const std::string*)u[1])->empty()), ttype); break;
+                        default: goto op_ins_error;
                     }
                     break;
+                default: goto op_ins_error;
             }
             break;
         case 18: // ++
@@ -2862,13 +2924,16 @@ void Script::_else(Script* s, Line& l)
 
 void Script::_return(Script* s, Line& l)
 {
-    if(l.hasResult)
+    if(l.params.empty() || l.hasResult)
     {
         s->setError();
         return;
     }
-    if(!l.params.empty()) s->ret(&l.params[0]);
-    else s->ret(nullptr);
+    switch(l.params[0].getType())
+    {
+        case CVAR: case GVAR: case RESULT: s->ret(&s->getVar(l.params[0])); break;
+        default: s->ret(&l.params[0]); break;
+    }
 }
 
 void Script::_while(Script* s, Line& l)
